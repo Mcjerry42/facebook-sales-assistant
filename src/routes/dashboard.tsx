@@ -1,23 +1,17 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Sheet as SheetUI, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Menu } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
+  // Auth lives in localStorage — render entirely on the client to avoid
+  // an SSR pass that has no session and produces a blank/hydration-mismatched page.
+  ssr: false,
   component: DashboardLayout,
-  beforeLoad: async () => {
-    // Auth state lives in localStorage which is unavailable during SSR.
-    // Running the check on the server always sees a null session and
-    // bounces every navigation back to /login, creating an infinite
-    // login ↔ dashboard loop. Skip on the server; the client gate below
-    // re-runs on hydration and the layout component renders nothing
-    // until the session is resolved.
-    if (typeof window === "undefined") return { user: null as any };
-    const { data } = await supabase.auth.getSession();
-    if (!data.session?.user) throw redirect({ to: "/login" });
-    return { user: data.session.user };
-  },
   errorComponent: DashboardError,
 });
 
@@ -47,46 +41,99 @@ const nav = [
 function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = Route.useRouteContext();
+  const [user, setUser] = useState<any>(null);
+  const [checking, setChecking] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      if (!data.session?.user) {
+        navigate({ to: "/login", replace: true });
+      } else {
+        setUser(data.session.user);
+        setChecking(false);
+      }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "SIGNED_OUT" || !s?.user) navigate({ to: "/login", replace: true });
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, [navigate]);
+
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
     navigate({ to: "/login" });
   };
 
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: "var(--gradient-hero)" }}>
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      </div>
+    );
+  }
+
+  const SidebarContent = () => (
+    <>
+      <Link to="/dashboard" className="mb-8 flex items-center gap-2 px-2 pt-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "var(--gradient-primary)" }}>
+          <Sparkles className="h-4 w-4 text-primary-foreground" />
+        </div>
+        <span className="font-semibold tracking-tight">MetaPilot</span>
+      </Link>
+      <nav className="flex-1 space-y-1">
+        {nav.map((item) => {
+          const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
+          return (
+            <Link key={item.to} to={item.to} className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
+              active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+            )}>
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="border-t border-sidebar-border pt-3">
+        <div className="px-3 py-2 text-xs text-muted-foreground truncate">{user?.email}</div>
+        <Button variant="ghost" size="sm" onClick={signOut} className="w-full justify-start gap-2">
+          <LogOut className="h-4 w-4" /> Sign out
+        </Button>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex min-h-screen" style={{ background: "var(--gradient-hero)" }}>
       <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
-        <Link to="/dashboard" className="mb-8 flex items-center gap-2 px-2 pt-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "var(--gradient-primary)" }}>
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold tracking-tight">MetaPilot</span>
-        </Link>
-        <nav className="flex-1 space-y-1">
-          {nav.map((item) => {
-            const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
-            return (
-              <Link key={item.to} to={item.to} className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
-                active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-              )}>
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="border-t border-sidebar-border pt-3">
-          <div className="px-3 py-2 text-xs text-muted-foreground truncate">{user?.email}</div>
-          <Button variant="ghost" size="sm" onClick={signOut} className="w-full justify-start gap-2">
-            <LogOut className="h-4 w-4" /> Sign out
-          </Button>
-        </div>
+        <SidebarContent />
       </aside>
-      <main className="flex-1 overflow-auto p-6 md:p-8">
-        <Outlet />
-      </main>
+      <div className="flex flex-1 flex-col">
+        <header className="flex items-center justify-between gap-3 border-b border-border/50 bg-sidebar/60 px-4 py-3 md:hidden">
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: "var(--gradient-primary)" }}>
+              <Sparkles className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="font-semibold tracking-tight">MetaPilot</span>
+          </Link>
+          <SheetUI open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 bg-sidebar p-4 flex flex-col">
+              <SidebarContent />
+            </SheetContent>
+          </SheetUI>
+        </header>
+        <main className="flex-1 overflow-auto p-4 md:p-8">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
