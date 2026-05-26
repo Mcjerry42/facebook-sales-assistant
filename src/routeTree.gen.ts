@@ -16,6 +16,7 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardOrdersRouteImport } from './routes/dashboard.orders'
 import { Route as DashboardInboxRouteImport } from './routes/dashboard.inbox'
 import { Route as DashboardCommentsRouteImport } from './routes/dashboard.comments'
+import { Route as DashboardAiRouteImport } from './routes/dashboard.ai'
 import { Route as ApiPublicFbWebhookRouteImport } from './routes/api/public/fb-webhook'
 
 const LoginRoute = LoginRouteImport.update({
@@ -53,6 +54,11 @@ const DashboardCommentsRoute = DashboardCommentsRouteImport.update({
   path: '/comments',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardAiRoute = DashboardAiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const ApiPublicFbWebhookRoute = ApiPublicFbWebhookRouteImport.update({
   id: '/api/public/fb-webhook',
   path: '/api/public/fb-webhook',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
+  '/dashboard/ai': typeof DashboardAiRoute
   '/dashboard/comments': typeof DashboardCommentsRoute
   '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/orders': typeof DashboardOrdersRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/dashboard/ai': typeof DashboardAiRoute
   '/dashboard/comments': typeof DashboardCommentsRoute
   '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/orders': typeof DashboardOrdersRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
+  '/dashboard/ai': typeof DashboardAiRoute
   '/dashboard/comments': typeof DashboardCommentsRoute
   '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/orders': typeof DashboardOrdersRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/login'
+    | '/dashboard/ai'
     | '/dashboard/comments'
     | '/dashboard/inbox'
     | '/dashboard/orders'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/dashboard/ai'
     | '/dashboard/comments'
     | '/dashboard/inbox'
     | '/dashboard/orders'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/login'
+    | '/dashboard/ai'
     | '/dashboard/comments'
     | '/dashboard/inbox'
     | '/dashboard/orders'
@@ -179,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCommentsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/ai': {
+      id: '/dashboard/ai'
+      path: '/ai'
+      fullPath: '/dashboard/ai'
+      preLoaderRoute: typeof DashboardAiRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/api/public/fb-webhook': {
       id: '/api/public/fb-webhook'
       path: '/api/public/fb-webhook'
@@ -190,6 +209,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteChildren {
+  DashboardAiRoute: typeof DashboardAiRoute
   DashboardCommentsRoute: typeof DashboardCommentsRoute
   DashboardInboxRoute: typeof DashboardInboxRoute
   DashboardOrdersRoute: typeof DashboardOrdersRoute
@@ -197,6 +217,7 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardAiRoute: DashboardAiRoute,
   DashboardCommentsRoute: DashboardCommentsRoute,
   DashboardInboxRoute: DashboardInboxRoute,
   DashboardOrdersRoute: DashboardOrdersRoute,
