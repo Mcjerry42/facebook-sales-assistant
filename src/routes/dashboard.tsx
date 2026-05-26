@@ -7,8 +7,13 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
   beforeLoad: async () => {
-    // Use cached session to avoid a network call on every navigation —
-    // the server-fn middleware re-validates the bearer token anyway.
+    // Auth state lives in localStorage which is unavailable during SSR.
+    // Running the check on the server always sees a null session and
+    // bounces every navigation back to /login, creating an infinite
+    // login ↔ dashboard loop. Skip on the server; the client gate below
+    // re-runs on hydration and the layout component renders nothing
+    // until the session is resolved.
+    if (typeof window === "undefined") return { user: null as any };
     const { data } = await supabase.auth.getSession();
     if (!data.session?.user) throw redirect({ to: "/login" });
     return { user: data.session.user };
