@@ -16,6 +16,7 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSheetsRouteImport } from './routes/dashboard.sheets'
 import { Route as DashboardOrdersRouteImport } from './routes/dashboard.orders'
 import { Route as DashboardInboxRouteImport } from './routes/dashboard.inbox'
+import { Route as DashboardConnectRouteImport } from './routes/dashboard.connect'
 import { Route as DashboardCommentsRouteImport } from './routes/dashboard.comments'
 import { Route as DashboardAnalyticsRouteImport } from './routes/dashboard.analytics'
 import { Route as DashboardAiRouteImport } from './routes/dashboard.ai'
@@ -56,6 +57,11 @@ const DashboardInboxRoute = DashboardInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardConnectRoute = DashboardConnectRouteImport.update({
+  id: '/connect',
+  path: '/connect',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardCommentsRoute = DashboardCommentsRouteImport.update({
   id: '/comments',
   path: '/comments',
@@ -84,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/ai': typeof DashboardAiRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/connect': typeof DashboardConnectRoute
   '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/orders': typeof DashboardOrdersRoute
   '/dashboard/sheets': typeof DashboardSheetsRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/dashboard/ai': typeof DashboardAiRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/connect': typeof DashboardConnectRoute
   '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/orders': typeof DashboardOrdersRoute
   '/dashboard/sheets': typeof DashboardSheetsRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/dashboard/ai': typeof DashboardAiRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/connect': typeof DashboardConnectRoute
   '/dashboard/inbox': typeof DashboardInboxRoute
   '/dashboard/orders': typeof DashboardOrdersRoute
   '/dashboard/sheets': typeof DashboardSheetsRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/dashboard/ai'
     | '/dashboard/analytics'
     | '/dashboard/comments'
+    | '/dashboard/connect'
     | '/dashboard/inbox'
     | '/dashboard/orders'
     | '/dashboard/sheets'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/dashboard/ai'
     | '/dashboard/analytics'
     | '/dashboard/comments'
+    | '/dashboard/connect'
     | '/dashboard/inbox'
     | '/dashboard/orders'
     | '/dashboard/sheets'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/dashboard/ai'
     | '/dashboard/analytics'
     | '/dashboard/comments'
+    | '/dashboard/connect'
     | '/dashboard/inbox'
     | '/dashboard/orders'
     | '/dashboard/sheets'
@@ -215,6 +227,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardInboxRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/connect': {
+      id: '/dashboard/connect'
+      path: '/connect'
+      fullPath: '/dashboard/connect'
+      preLoaderRoute: typeof DashboardConnectRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/comments': {
       id: '/dashboard/comments'
       path: '/comments'
@@ -250,6 +269,7 @@ interface DashboardRouteChildren {
   DashboardAiRoute: typeof DashboardAiRoute
   DashboardAnalyticsRoute: typeof DashboardAnalyticsRoute
   DashboardCommentsRoute: typeof DashboardCommentsRoute
+  DashboardConnectRoute: typeof DashboardConnectRoute
   DashboardInboxRoute: typeof DashboardInboxRoute
   DashboardOrdersRoute: typeof DashboardOrdersRoute
   DashboardSheetsRoute: typeof DashboardSheetsRoute
@@ -260,6 +280,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAiRoute: DashboardAiRoute,
   DashboardAnalyticsRoute: DashboardAnalyticsRoute,
   DashboardCommentsRoute: DashboardCommentsRoute,
+  DashboardConnectRoute: DashboardConnectRoute,
   DashboardInboxRoute: DashboardInboxRoute,
   DashboardOrdersRoute: DashboardOrdersRoute,
   DashboardSheetsRoute: DashboardSheetsRoute,
