@@ -81,7 +81,7 @@ function ConnectPage() {
   );
 }
 
-function Field({ label, value, onChange, type }: any) {
+function Field({ label, value, onChange, type }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
   return (
     <div>
       <Label>{label}</Label>
