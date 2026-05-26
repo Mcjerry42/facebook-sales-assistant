@@ -12,6 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as DashboardSheetsRouteImport } from './routes/dashboard.sheets'
+import { Route as DashboardOrdersRouteImport } from './routes/dashboard.orders'
+import { Route as DashboardInboxRouteImport } from './routes/dashboard.inbox'
+import { Route as DashboardConnectRouteImport } from './routes/dashboard.connect'
+import { Route as DashboardCommentsRouteImport } from './routes/dashboard.comments'
+import { Route as DashboardAnalyticsRouteImport } from './routes/dashboard.analytics'
+import { Route as DashboardAiRouteImport } from './routes/dashboard.ai'
 import { Route as ApiPublicFbWebhookRouteImport } from './routes/api/public/fb-webhook'
 
 const LoginRoute = LoginRouteImport.update({
@@ -29,6 +37,46 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSheetsRoute = DashboardSheetsRouteImport.update({
+  id: '/sheets',
+  path: '/sheets',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardOrdersRoute = DashboardOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardInboxRoute = DashboardInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardConnectRoute = DashboardConnectRouteImport.update({
+  id: '/connect',
+  path: '/connect',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardCommentsRoute = DashboardCommentsRouteImport.update({
+  id: '/comments',
+  path: '/comments',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAnalyticsRoute = DashboardAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAiRoute = DashboardAiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const ApiPublicFbWebhookRoute = ApiPublicFbWebhookRouteImport.update({
   id: '/api/public/fb-webhook',
   path: '/api/public/fb-webhook',
@@ -37,34 +85,93 @@ const ApiPublicFbWebhookRoute = ApiPublicFbWebhookRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
+  '/dashboard/ai': typeof DashboardAiRoute
+  '/dashboard/analytics': typeof DashboardAnalyticsRoute
+  '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/connect': typeof DashboardConnectRoute
+  '/dashboard/inbox': typeof DashboardInboxRoute
+  '/dashboard/orders': typeof DashboardOrdersRoute
+  '/dashboard/sheets': typeof DashboardSheetsRoute
+  '/dashboard/': typeof DashboardIndexRoute
   '/api/public/fb-webhook': typeof ApiPublicFbWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/dashboard/ai': typeof DashboardAiRoute
+  '/dashboard/analytics': typeof DashboardAnalyticsRoute
+  '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/connect': typeof DashboardConnectRoute
+  '/dashboard/inbox': typeof DashboardInboxRoute
+  '/dashboard/orders': typeof DashboardOrdersRoute
+  '/dashboard/sheets': typeof DashboardSheetsRoute
+  '/dashboard': typeof DashboardIndexRoute
   '/api/public/fb-webhook': typeof ApiPublicFbWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
+  '/dashboard/ai': typeof DashboardAiRoute
+  '/dashboard/analytics': typeof DashboardAnalyticsRoute
+  '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/connect': typeof DashboardConnectRoute
+  '/dashboard/inbox': typeof DashboardInboxRoute
+  '/dashboard/orders': typeof DashboardOrdersRoute
+  '/dashboard/sheets': typeof DashboardSheetsRoute
+  '/dashboard/': typeof DashboardIndexRoute
   '/api/public/fb-webhook': typeof ApiPublicFbWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/login' | '/api/public/fb-webhook'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/dashboard/ai'
+    | '/dashboard/analytics'
+    | '/dashboard/comments'
+    | '/dashboard/connect'
+    | '/dashboard/inbox'
+    | '/dashboard/orders'
+    | '/dashboard/sheets'
+    | '/dashboard/'
+    | '/api/public/fb-webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/login' | '/api/public/fb-webhook'
-  id: '__root__' | '/' | '/dashboard' | '/login' | '/api/public/fb-webhook'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard/ai'
+    | '/dashboard/analytics'
+    | '/dashboard/comments'
+    | '/dashboard/connect'
+    | '/dashboard/inbox'
+    | '/dashboard/orders'
+    | '/dashboard/sheets'
+    | '/dashboard'
+    | '/api/public/fb-webhook'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/dashboard/ai'
+    | '/dashboard/analytics'
+    | '/dashboard/comments'
+    | '/dashboard/connect'
+    | '/dashboard/inbox'
+    | '/dashboard/orders'
+    | '/dashboard/sheets'
+    | '/dashboard/'
+    | '/api/public/fb-webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DashboardRoute: typeof DashboardRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiPublicFbWebhookRoute: typeof ApiPublicFbWebhookRoute
 }
@@ -92,6 +199,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/sheets': {
+      id: '/dashboard/sheets'
+      path: '/sheets'
+      fullPath: '/dashboard/sheets'
+      preLoaderRoute: typeof DashboardSheetsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/orders': {
+      id: '/dashboard/orders'
+      path: '/orders'
+      fullPath: '/dashboard/orders'
+      preLoaderRoute: typeof DashboardOrdersRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/inbox': {
+      id: '/dashboard/inbox'
+      path: '/inbox'
+      fullPath: '/dashboard/inbox'
+      preLoaderRoute: typeof DashboardInboxRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/connect': {
+      id: '/dashboard/connect'
+      path: '/connect'
+      fullPath: '/dashboard/connect'
+      preLoaderRoute: typeof DashboardConnectRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/comments': {
+      id: '/dashboard/comments'
+      path: '/comments'
+      fullPath: '/dashboard/comments'
+      preLoaderRoute: typeof DashboardCommentsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/analytics': {
+      id: '/dashboard/analytics'
+      path: '/analytics'
+      fullPath: '/dashboard/analytics'
+      preLoaderRoute: typeof DashboardAnalyticsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/ai': {
+      id: '/dashboard/ai'
+      path: '/ai'
+      fullPath: '/dashboard/ai'
+      preLoaderRoute: typeof DashboardAiRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/api/public/fb-webhook': {
       id: '/api/public/fb-webhook'
       path: '/api/public/fb-webhook'
@@ -102,9 +265,35 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DashboardRouteChildren {
+  DashboardAiRoute: typeof DashboardAiRoute
+  DashboardAnalyticsRoute: typeof DashboardAnalyticsRoute
+  DashboardCommentsRoute: typeof DashboardCommentsRoute
+  DashboardConnectRoute: typeof DashboardConnectRoute
+  DashboardInboxRoute: typeof DashboardInboxRoute
+  DashboardOrdersRoute: typeof DashboardOrdersRoute
+  DashboardSheetsRoute: typeof DashboardSheetsRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardAiRoute: DashboardAiRoute,
+  DashboardAnalyticsRoute: DashboardAnalyticsRoute,
+  DashboardCommentsRoute: DashboardCommentsRoute,
+  DashboardConnectRoute: DashboardConnectRoute,
+  DashboardInboxRoute: DashboardInboxRoute,
+  DashboardOrdersRoute: DashboardOrdersRoute,
+  DashboardSheetsRoute: DashboardSheetsRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRoute: DashboardRoute,
+  DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiPublicFbWebhookRoute: ApiPublicFbWebhookRoute,
 }
