@@ -1,5 +1,4 @@
-import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles } from "lucide-react";
@@ -11,8 +10,22 @@ export const Route = createFileRoute("/dashboard")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/login" });
+    return { user: data.user };
   },
+  errorComponent: DashboardError,
 });
+
+function DashboardError({ error, reset }: { error: Error; reset: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-6 bg-background">
+      <div className="max-w-md text-center space-y-4">
+        <h1 className="text-xl font-semibold">Dashboard failed to load</h1>
+        <p className="text-sm text-muted-foreground break-words">{error?.message ?? "Unknown error"}</p>
+        <Button onClick={() => reset()}>Try again</Button>
+      </div>
+    </div>
+  );
+}
 
 const nav = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -28,11 +41,7 @@ const nav = [
 function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading } = useAuth();
-
-  useEffect(() => {
-    if (!loading && !user) navigate({ to: "/login" });
-  }, [loading, user, navigate]);
+  const { user } = Route.useRouteContext();
 
   const signOut = async () => {
     await supabase.auth.signOut();
