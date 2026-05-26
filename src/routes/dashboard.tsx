@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
   beforeLoad: async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/login" });
-    return { user: data.user };
+    // Use cached session to avoid a network call on every navigation —
+    // the server-fn middleware re-validates the bearer token anyway.
+    const { data } = await supabase.auth.getSession();
+    if (!data.session?.user) throw redirect({ to: "/login" });
+    return { user: data.session.user };
   },
   errorComponent: DashboardError,
 });
