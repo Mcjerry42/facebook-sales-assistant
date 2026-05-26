@@ -18,14 +18,12 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      if (s) navigate({ to: "/dashboard" });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "SIGNED_IN" && s) navigate({ to: "/dashboard" });
     });
-    supabase.auth.getUser()
-      .then(({ data }) => {
-        if (data?.user) navigate({ to: "/dashboard" });
-      })
-      .catch(() => { /* ignore — user just isn't signed in */ });
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) navigate({ to: "/dashboard" });
+    });
     return () => subscription.unsubscribe();
   }, [navigate]);
 
