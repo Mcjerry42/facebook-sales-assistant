@@ -21,9 +21,11 @@ function LoginPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       if (s) navigate({ to: "/dashboard" });
     });
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/dashboard" });
-    });
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        if (data?.user) navigate({ to: "/dashboard" });
+      })
+      .catch(() => { /* ignore — user just isn't signed in */ });
     return () => subscription.unsubscribe();
   }, [navigate]);
 
@@ -50,8 +52,12 @@ function LoginPage() {
   };
 
   const handleGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/dashboard" });
-    if (result.error) toast.error("Google sign-in failed");
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/dashboard" });
+      if (result?.error) toast.error("Google sign-in failed");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Google sign-in failed");
+    }
   };
 
   return (
