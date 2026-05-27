@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { metapilotSupabase } from "@/lib/metapilot-supabase.client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +18,10 @@ function LoginPage() {
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+    const { data: { subscription } } = metapilotSupabase.auth.onAuthStateChange((event, s) => {
       if (event === "SIGNED_IN" && s) navigate({ to: "/dashboard" });
     });
-    supabase.auth.getSession().then(({ data }) => {
+    metapilotSupabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) navigate({ to: "/dashboard" });
     });
     return () => subscription.unsubscribe();
@@ -34,7 +33,7 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
+        const { data, error } = await metapilotSupabase.auth.signUp({
           email, password,
           options: { emailRedirectTo: window.location.origin + "/dashboard" },
         });
@@ -49,7 +48,7 @@ function LoginPage() {
           setMode("signin");
         }
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await metapilotSupabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         if (!data.session?.user) throw new Error("Sign in did not return a session. Please try again.");
         toast.success("Signed in");
@@ -68,11 +67,11 @@ function LoginPage() {
   const handleGoogle = async () => {
     setMessage({ type: "info", text: "Opening Google sign-in…" });
     try {
-      const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/dashboard" });
-      if (result?.error) {
-        toast.error("Google sign-in failed");
-        setMessage({ type: "error", text: "Google sign-in failed. Please try email/password." });
-      }
+      const { error } = await metapilotSupabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin + "/dashboard" },
+      });
+      if (error) throw error;
     } catch (err: any) {
       const text = err?.message ?? "Google sign-in failed";
       toast.error(text);
