@@ -1,7 +1,27 @@
-import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  useNavigate,
+  Link,
+  useLocation,
+  redirect,
+} from "@tanstack/react-router";
+import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
-import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles } from "lucide-react";
+import {
+  LayoutDashboard,
+  MessageSquare,
+  MessageCircle,
+  ShoppingBag,
+  Brain,
+  Sheet,
+  BarChart3,
+  Settings,
+  LogOut,
+  Sparkles,
+  ShieldCheck,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet as SheetUI, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -22,7 +42,9 @@ function DashboardError({ error, reset }: { error: Error; reset: () => void }) {
     <div className="flex min-h-screen items-center justify-center p-6 bg-background">
       <div className="max-w-md text-center space-y-4">
         <h1 className="text-xl font-semibold">Dashboard failed to load</h1>
-        <p className="text-sm text-muted-foreground break-words">{error?.message ?? "Unknown error"}</p>
+        <p className="text-sm text-muted-foreground break-words">
+          {error?.message ?? "Unknown error"}
+        </p>
         <Button onClick={() => reset()}>Try again</Button>
       </div>
     </div>
@@ -38,12 +60,13 @@ const nav = [
   { to: "/dashboard/sheets", label: "Google Sheets", icon: Sheet },
   { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/dashboard/connect", label: "Facebook & API", icon: Settings },
+  { to: "/dashboard/admin", label: "Admin Controls", icon: ShieldCheck },
 ];
 
 function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -59,26 +82,43 @@ function DashboardLayout() {
       const u = data.session.user;
       setUser(u);
       const [{ data: profile }, { data: roleRow }] = await Promise.all([
-        metapilotSupabase.from("profiles").select("is_approved, approved_until").eq("id", u.id).maybeSingle(),
-        metapilotSupabase.from("user_roles").select("role").eq("user_id", u.id).eq("role", "admin").maybeSingle(),
+        metapilotSupabase
+          .from("profiles")
+          .select("is_approved, approved_until")
+          .eq("id", u.id)
+          .maybeSingle(),
+        metapilotSupabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", u.id)
+          .eq("role", "admin")
+          .maybeSingle(),
       ]);
       if (!mounted) return;
-      const notExpired = !profile?.approved_until || new Date(profile.approved_until).getTime() > Date.now();
+      const notExpired =
+        !profile?.approved_until || new Date(profile.approved_until).getTime() > Date.now();
       const approved = (!!profile?.is_approved && notExpired) || !!roleRow;
       setIsApproved(approved);
       setChecking(false);
     });
-    const { data: { subscription } } = metapilotSupabase.auth.onAuthStateChange((event, s) => {
+    const {
+      data: { subscription },
+    } = metapilotSupabase.auth.onAuthStateChange((event, s) => {
       // Only react to explicit sign-out. INITIAL_SESSION / TOKEN_REFRESHED
       // can briefly fire with a transient null session and cause flash redirects.
       if (event === "SIGNED_OUT") navigate({ to: "/login", replace: true });
       else if (s?.user) setUser(s.user);
     });
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   const signOut = async () => {
     await metapilotSupabase.auth.signOut();
@@ -96,19 +136,30 @@ function DashboardLayout() {
   const SidebarContent = () => (
     <>
       <Link to="/dashboard" className="mb-8 flex items-center gap-2 px-2 pt-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "var(--gradient-primary)" }}>
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-lg"
+          style={{ background: "var(--gradient-primary)" }}
+        >
           <Sparkles className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="font-semibold tracking-tight">MetaPilot</span>
       </Link>
       <nav className="flex-1 space-y-1">
         {nav.map((item) => {
-          const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
+          const active = item.exact
+            ? location.pathname === item.to
+            : location.pathname.startsWith(item.to);
           return (
-            <Link key={item.to} to={item.to} className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
-              active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-            )}>
+            <Link
+              key={item.to}
+              to={item.to}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
+                active
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+              )}
+            >
               <item.icon className="h-4 w-4" />
               {item.label}
             </Link>
@@ -132,14 +183,19 @@ function DashboardLayout() {
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b border-border/50 bg-sidebar/60 px-4 py-3 md:hidden">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: "var(--gradient-primary)" }}>
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-lg"
+              style={{ background: "var(--gradient-primary)" }}
+            >
               <Sparkles className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="font-semibold tracking-tight">MetaPilot</span>
           </Link>
           <SheetUI open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-5 w-5" />
+              </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 bg-sidebar p-4 flex flex-col">
               <SidebarContent />

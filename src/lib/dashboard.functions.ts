@@ -2,9 +2,35 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireMetapilotAuth } from "@/lib/metapilot-auth-middleware";
 import { z } from "zod";
 
-async function assertAdmin(supabase: any, userId: string) {
-  const { data, error } = await supabase
-    .from("user_roles")
+type DbError = { message: string } | null;
+type RoleSelector = {
+  select: (columns: string) => {
+    eq: (
+      column: string,
+      value: string,
+    ) => {
+      eq: (
+        column: string,
+        value: string,
+      ) => {
+        maybeSingle: () => PromiseLike<{ data: unknown; error: DbError }>;
+      };
+    };
+  };
+};
+type RoleClient = {
+  from: (table: string) => unknown;
+};
+type KnowledgeEntry = { question: string | null; answer: string | null };
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function assertAdmin(supabase: unknown, userId: string) {
+  const db = supabase as RoleClient;
+  const userRoles = db.from("user_roles") as RoleSelector;
+  const { data, error } = await userRoles
     .select("role")
     .eq("user_id", userId)
     .eq("role", "admin")
@@ -18,7 +44,11 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
     const [convs, orders, comments, msgs, settings, fb, sheets] = await Promise.all([
-      supabase.from("conversations").select("id,fb_user_name,last_message,last_message_at,unread_count,human_takeover").order("last_message_at", { ascending: false }).limit(50),
+      supabase
+        .from("conversations")
+        .select("id,fb_user_name,last_message,last_message_at,unread_count,human_takeover")
+        .order("last_message_at", { ascending: false })
+        .limit(50),
       supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(50),
       supabase.from("comments").select("*").order("created_at", { ascending: false }).limit(50),
       supabase.from("messages").select("id", { count: "exact", head: true }),
@@ -51,6 +81,96 @@ export const getMessages = createServerFn({ method: "GET" })
     return msgs ?? [];
   });
 
+export const getAdminControls = createServerFn({ method: "GET" })
+  .middleware([requireMetapilotAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    await assertAdmin(supabase, userId);
+
+    const [profiles, settings] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id,email,full_name,is_approved,approved_until,created_at")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("app_settings")
+        .select(
+          "id,price_bdt,duration_days,whatsapp_number,package_name,paywall_title,paywall_message,updated_at",
+        )
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (profiles.error) throw new Error(profiles.error.message);
+    if (settings.error) throw new Error(settings.error.message);
+
+    return {
+      profiles: profiles.data ?? [],
+      settings: settings.data,
+    };
+  });
+
+export const updateUserApproval = createServerFn({ method: "POST" })
+  .middleware([requireMetapilotAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        userId: z.string().uuid(),
+        is_approved: z.boolean(),
+        approved_until: z.string().datetime().nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    await assertAdmin(supabase, userId);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        is_approved: data.is_approved,
+        approved_until: data.approved_until ?? null,
+      })
+      .eq("id", data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const PackageSettingsSchema = z.object({
+  price_bdt: z.coerce.number().min(0).max(10000000),
+  duration_days: z.coerce.number().int().min(1).max(3650),
+  whatsapp_number: z.string().max(50).nullable().optional(),
+  package_name: z.string().min(1).max(100),
+  paywall_title: z.string().min(1).max(200),
+  paywall_message: z.string().min(1).max(1200),
+});
+
+export const savePackageSettings = createServerFn({ method: "POST" })
+  .middleware([requireMetapilotAuth])
+  .inputValidator((input: unknown) => PackageSettingsSchema.parse(input))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    await assertAdmin(supabase, userId);
+
+    const { data: existing, error: findError } = await supabase
+      .from("app_settings")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+    if (findError) throw new Error(findError.message);
+
+    const payload = {
+      ...data,
+      whatsapp_number: data.whatsapp_number || null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = existing
+      ? await supabase.from("app_settings").update(payload).eq("id", existing.id)
+      : await supabase.from("app_settings").insert(payload);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 const AiSettingsSchema = z.object({
   provider: z.enum(["lovable", "openai", "gemini"]),
   model: z.string().min(1).max(100),
@@ -69,9 +189,16 @@ export const saveAiSettings = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
-    const { data: existing } = await supabase.from("ai_settings").select("id").limit(1).maybeSingle();
+    const { data: existing } = await supabase
+      .from("ai_settings")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
     if (existing) {
-      const { error } = await supabase.from("ai_settings").update({ ...data, updated_at: new Date().toISOString() }).eq("id", existing.id);
+      const { error } = await supabase
+        .from("ai_settings")
+        .update({ ...data, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
       if (error) throw new Error(error.message);
     } else {
       const { error } = await supabase.from("ai_settings").insert(data);
@@ -96,7 +223,11 @@ export const saveFbConfig = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
     const { data: existing } = await supabase.from("fb_config").select("id").limit(1).maybeSingle();
-    const payload = { ...data, connected: !!data.page_access_token, updated_at: new Date().toISOString() };
+    const payload = {
+      ...data,
+      connected: !!data.page_access_token,
+      updated_at: new Date().toISOString(),
+    };
     if (existing) {
       const { error } = await supabase.from("fb_config").update(payload).eq("id", existing.id);
       if (error) throw new Error(error.message);
@@ -130,7 +261,9 @@ export const connectSheet = createServerFn({ method: "POST" })
     const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(data.sheet_name)}`;
     const res = await fetch(csvUrl);
     if (!res.ok) {
-      throw new Error("Could not read the sheet. Make sure sharing is set to 'Anyone with the link'.");
+      throw new Error(
+        "Could not read the sheet. Make sure sharing is set to 'Anyone with the link'.",
+      );
     }
     const csv = await res.text();
     const rows = parseCsv(csv);
@@ -142,19 +275,29 @@ export const connectSheet = createServerFn({ method: "POST" })
     const cIdx = headers.findIndex((h) => h.includes("category") || h.includes("ক্যাটাগরি"));
 
     // Clear and re-insert
-    await supabase.from("knowledge_entries").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    const entries = rows.slice(1).filter((r) => r.some((c) => c.trim())).map((row) => ({
-      question: qIdx >= 0 ? row[qIdx] : row[0],
-      answer: aIdx >= 0 ? row[aIdx] : row.slice(1).join(" | "),
-      category: cIdx >= 0 ? row[cIdx] : null,
-      raw_row: row.reduce((acc, val, i) => ({ ...acc, [headers[i] ?? `col${i}`]: val }), {}),
-    }));
+    await supabase
+      .from("knowledge_entries")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+    const entries = rows
+      .slice(1)
+      .filter((r) => r.some((c) => c.trim()))
+      .map((row) => ({
+        question: qIdx >= 0 ? row[qIdx] : row[0],
+        answer: aIdx >= 0 ? row[aIdx] : row.slice(1).join(" | "),
+        category: cIdx >= 0 ? row[cIdx] : null,
+        raw_row: row.reduce((acc, val, i) => ({ ...acc, [headers[i] ?? `col${i}`]: val }), {}),
+      }));
     if (entries.length > 0) {
       const { error } = await supabase.from("knowledge_entries").insert(entries);
       if (error) throw new Error(error.message);
     }
 
-    const { data: existing } = await supabase.from("sheets_config").select("id").limit(1).maybeSingle();
+    const { data: existing } = await supabase
+      .from("sheets_config")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
     const payload = {
       sheet_url: data.sheet_url,
       sheet_id: sheetId,
@@ -178,18 +321,30 @@ function parseCsv(text: string): string[][] {
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (inQuotes) {
-      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
-      else if (ch === '"') inQuotes = false;
+      if (ch === '"' && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (ch === '"') inQuotes = false;
       else field += ch;
     } else {
       if (ch === '"') inQuotes = true;
-      else if (ch === ",") { cur.push(field); field = ""; }
-      else if (ch === "\n") { cur.push(field); rows.push(cur); cur = []; field = ""; }
-      else if (ch === "\r") { /* skip */ }
-      else field += ch;
+      else if (ch === ",") {
+        cur.push(field);
+        field = "";
+      } else if (ch === "\n") {
+        cur.push(field);
+        rows.push(cur);
+        cur = [];
+        field = "";
+      } else if (ch === "\r") {
+        /* skip */
+      } else field += ch;
     }
   }
-  if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
+  if (field.length > 0 || cur.length > 0) {
+    cur.push(field);
+    rows.push(cur);
+  }
   return rows;
 }
 
@@ -199,8 +354,15 @@ export const askAi = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
-    const { data: settings } = await supabase.from("ai_settings").select("*").limit(1).maybeSingle();
-    const { data: kb } = await supabase.from("knowledge_entries").select("question,answer,category").limit(200);
+    const { data: settings } = await supabase
+      .from("ai_settings")
+      .select("*")
+      .limit(1)
+      .maybeSingle();
+    const { data: kb } = await supabase
+      .from("knowledge_entries")
+      .select("question,answer,category")
+      .limit(200);
 
     const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
     const { generateText } = await import("ai");
@@ -209,7 +371,9 @@ export const askAi = createServerFn({ method: "POST" })
 
     const gateway = createLovableAiGatewayProvider(apiKey);
     const model = gateway(settings?.model ?? "google/gemini-3-flash-preview");
-    const kbText = (kb ?? []).map((k: any) => `Q: ${k.question}\nA: ${k.answer}`).join("\n---\n");
+    const kbText = ((kb ?? []) as KnowledgeEntry[])
+      .map((k) => `Q: ${k.question}\nA: ${k.answer}`)
+      .join("\n---\n");
     const system = `${settings?.system_instructions ?? ""}\n\nKnowledge Base:\n${kbText || "(empty — admin has not connected Google Sheets yet)"}`;
 
     const result = await generateText({
@@ -222,22 +386,37 @@ export const askAi = createServerFn({ method: "POST" })
 
 export const toggleHumanTakeover = createServerFn({ method: "POST" })
   .middleware([requireMetapilotAuth])
-  .inputValidator((d: unknown) => z.object({ conversationId: z.string().uuid(), enabled: z.boolean() }).parse(d))
+  .inputValidator((d: unknown) =>
+    z.object({ conversationId: z.string().uuid(), enabled: z.boolean() }).parse(d),
+  )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
-    const { error } = await supabase.from("conversations").update({ human_takeover: data.enabled }).eq("id", data.conversationId);
+    const { error } = await supabase
+      .from("conversations")
+      .update({ human_takeover: data.enabled })
+      .eq("id", data.conversationId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireMetapilotAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), status: z.enum(["pending", "confirmed", "shipped", "delivered", "cancelled"]) }).parse(d))
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(["pending", "confirmed", "shipped", "delivered", "cancelled"]),
+      })
+      .parse(d),
+  )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
-    const { error } = await supabase.from("orders").update({ status: data.status }).eq("id", data.id);
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: data.status })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -250,11 +429,18 @@ export const saveOrdersSheet = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
-    const { data: existing } = await supabase.from("sheets_config").select("id").limit(1).maybeSingle();
+    const { data: existing } = await supabase
+      .from("sheets_config")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
     if (existing) {
       const { error } = await supabase
         .from("sheets_config")
-        .update({ orders_sheet_url: data.orders_sheet_url ?? null, updated_at: new Date().toISOString() })
+        .update({
+          orders_sheet_url: data.orders_sheet_url ?? null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", existing.id);
       if (error) throw new Error(error.message);
     } else {
@@ -296,8 +482,8 @@ export const testOrdersSheet = createServerFn({ method: "POST" })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sample),
       });
-    } catch (err: any) {
-      throw new Error("Network error: " + (err?.message ?? String(err)));
+    } catch (err: unknown) {
+      throw new Error("Network error: " + errorMessage(err));
     }
     const text = await res.text();
     if (!res.ok) {
