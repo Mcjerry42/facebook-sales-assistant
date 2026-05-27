@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { metapilotSupabaseAdmin } from "@/lib/metapilot-supabase.server";
 
 /**
  * Attempts to extract a structured order from the recent conversation
@@ -15,7 +15,7 @@ export async function tryExtractAndSaveOrder(args: {
 
   // Don't double-create an order for the same conversation in the last 24h
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await metapilotSupabaseAdmin
     .from("orders")
     .select("id")
     .eq("conversation_id", args.conversationId)
@@ -24,7 +24,7 @@ export async function tryExtractAndSaveOrder(args: {
     .maybeSingle();
   if (existing) return { saved: false, reason: "already_exists" };
 
-  const { data: history } = await supabaseAdmin
+  const { data: history } = await metapilotSupabaseAdmin
     .from("messages")
     .select("sender,text,is_ai,created_at")
     .eq("conversation_id", args.conversationId)
@@ -79,7 +79,7 @@ Rules:
       items.reduce((s: number, it: any) => s + Number(it.price ?? 0) * Number(it.quantity ?? 1), 0),
   );
 
-  const { data: inserted, error } = await supabaseAdmin
+  const { data: inserted, error } = await metapilotSupabaseAdmin
     .from("orders")
     .insert({
       conversation_id: args.conversationId,
@@ -110,7 +110,7 @@ Rules:
 }
 
 async function pushOrderToSheet(order: any) {
-  const { data: cfg } = await supabaseAdmin
+  const { data: cfg } = await metapilotSupabaseAdmin
     .from("sheets_config")
     .select("orders_sheet_url")
     .limit(1)
@@ -133,8 +133,8 @@ async function pushOrderToSheet(order: any) {
       notes: order.notes,
     }),
   });
-  await supabaseAdmin
+  await metapilotSupabaseAdmin
     .from("sheets_config")
     .update({ orders_last_synced_at: new Date().toISOString() })
-    .eq("id", (await supabaseAdmin.from("sheets_config").select("id").limit(1).maybeSingle()).data!.id);
+    .eq("id", (await metapilotSupabaseAdmin.from("sheets_config").select("id").limit(1).maybeSingle()).data!.id);
 }

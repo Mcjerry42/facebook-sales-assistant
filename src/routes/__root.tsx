@@ -8,7 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { metapilotSupabase } from "@/lib/metapilot-supabase.client";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
@@ -116,7 +116,7 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = metapilotSupabase.auth.onAuthStateChange((event) => {
       // Avoid an infinite loop with INITIAL_SESSION / TOKEN_REFRESHED firing on every fetch.
       if (event === "SIGNED_OUT") {
         // Clear cached queries instead of invalidating — invalidation would
