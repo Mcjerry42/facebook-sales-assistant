@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
-import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles, Users } from "lucide-react";
+import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet as SheetUI, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -37,7 +37,6 @@ const nav = [
   { to: "/dashboard/ai", label: "AI Settings", icon: Brain },
   { to: "/dashboard/sheets", label: "Google Sheets", icon: Sheet },
   { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/dashboard/users", label: "Users & Pricing", icon: Users },
   { to: "/dashboard/connect", label: "Facebook & API", icon: Settings },
 ];
 
@@ -47,7 +46,6 @@ function DashboardLayout() {
   const [user, setUser] = useState<any>(null);
   const [checking, setChecking] = useState(true);
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -61,12 +59,13 @@ function DashboardLayout() {
       const u = data.session.user;
       setUser(u);
       const [{ data: profile }, { data: roleRow }] = await Promise.all([
-        metapilotSupabase.from("profiles").select("is_approved").eq("id", u.id).maybeSingle(),
+        metapilotSupabase.from("profiles").select("is_approved, approved_until").eq("id", u.id).maybeSingle(),
         metapilotSupabase.from("user_roles").select("role").eq("user_id", u.id).eq("role", "admin").maybeSingle(),
       ]);
       if (!mounted) return;
-      setIsAdmin(!!roleRow);
-      setIsApproved(!!profile?.is_approved || !!roleRow);
+      const notExpired = !profile?.approved_until || new Date(profile.approved_until).getTime() > Date.now();
+      const approved = (!!profile?.is_approved && notExpired) || !!roleRow;
+      setIsApproved(approved);
       setChecking(false);
     });
     const { data: { subscription } } = metapilotSupabase.auth.onAuthStateChange((event, s) => {
@@ -103,7 +102,7 @@ function DashboardLayout() {
         <span className="font-semibold tracking-tight">MetaPilot</span>
       </Link>
       <nav className="flex-1 space-y-1">
-        {nav.filter((item) => item.to !== "/dashboard/users" || isAdmin).map((item) => {
+        {nav.map((item) => {
           const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
           return (
             <Link key={item.to} to={item.to} className={cn(
