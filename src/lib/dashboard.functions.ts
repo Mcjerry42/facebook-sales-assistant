@@ -2,7 +2,23 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireMetapilotAuth } from "@/lib/metapilot-auth-middleware";
 import { z } from "zod";
 
-async function assertAdmin(supabase: any, userId: string) {
+type DbError = { message: string } | null;
+type RoleQuery = {
+  eq: (column: string, value: string) => RoleQuery;
+  maybeSingle: () => Promise<{ data: unknown; error: DbError }>;
+};
+type RoleClient = {
+  from: (table: string) => {
+    select: (columns: string) => RoleQuery;
+  };
+};
+type KnowledgeEntry = { question: string | null; answer: string | null };
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function assertAdmin(supabase: RoleClient, userId: string) {
   const { data, error } = await supabase
     .from("user_roles")
     .select("role")
@@ -345,7 +361,9 @@ export const askAi = createServerFn({ method: "POST" })
 
     const gateway = createLovableAiGatewayProvider(apiKey);
     const model = gateway(settings?.model ?? "google/gemini-3-flash-preview");
-    const kbText = (kb ?? []).map((k: any) => `Q: ${k.question}\nA: ${k.answer}`).join("\n---\n");
+    const kbText = ((kb ?? []) as KnowledgeEntry[])
+      .map((k) => `Q: ${k.question}\nA: ${k.answer}`)
+      .join("\n---\n");
     const system = `${settings?.system_instructions ?? ""}\n\nKnowledge Base:\n${kbText || "(empty — admin has not connected Google Sheets yet)"}`;
 
     const result = await generateText({
@@ -454,8 +472,8 @@ export const testOrdersSheet = createServerFn({ method: "POST" })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sample),
       });
-    } catch (err: any) {
-      throw new Error("Network error: " + (err?.message ?? String(err)));
+    } catch (err: unknown) {
+      throw new Error("Network error: " + errorMessage(err));
     }
     const text = await res.text();
     if (!res.ok) {
