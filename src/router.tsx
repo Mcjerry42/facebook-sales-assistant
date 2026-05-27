@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { PageLoader } from "./components/page-loader";
 
 export const getRouter = () => {
   const queryClient = new QueryClient({
@@ -18,8 +19,13 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreloadStaleTime: 0,
-    defaultPreload: false,
+    // Preload data on link hover/focus so navigations feel instant and
+    // we don't flash a blank state on the next page.
+    defaultPreload: "intent",
+    defaultPreloadStaleTime: 30_000,
+    defaultPendingMs: 150,
+    defaultPendingMinMs: 200,
+    defaultPendingComponent: () => <PageLoader />,
   });
 
   return router;
