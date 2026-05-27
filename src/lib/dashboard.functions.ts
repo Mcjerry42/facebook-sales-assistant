@@ -21,8 +21,9 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function assertAdmin(supabase: RoleClient, userId: string) {
-  const userRoles = supabase.from("user_roles") as RoleSelector;
+async function assertAdmin(supabase: unknown, userId: string) {
+  const db = supabase as RoleClient;
+  const userRoles = db.from("user_roles") as RoleSelector;
   const { data, error } = await userRoles
     .select("role")
     .eq("user_id", userId)
