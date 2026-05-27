@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/dashboard/ai")({ component: AiSettingsPage });
+export const Route = createFileRoute("/dashboard/ai")({ ssr: false, component: AiSettingsPage });
 
 const MODELS = [
   "google/gemini-3-flash-preview",
@@ -22,12 +22,24 @@ const MODELS = [
   "openai/gpt-5",
 ];
 
+const DEFAULT_FORM = {
+  provider: "lovable",
+  model: "google/gemini-3-flash-preview",
+  api_key: null,
+  system_instructions: "You are a friendly Bengali/English sales agent. Reply in the same language as the customer.",
+  language_mode: "auto",
+  auto_reply_messages: true,
+  auto_reply_comments: true,
+  auto_hide_abusive: true,
+  comment_trigger_keywords: ["price", "দাম", "details", "বিস্তারিত", "inbox", "order"],
+};
+
 function AiSettingsPage() {
   const overviewFn = useServerFn(getDashboardOverview);
   const saveFn = useServerFn(saveAiSettings);
   const askFn = useServerFn(askAi);
   const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ["overview"], queryFn: () => overviewFn() });
+  const { data, isLoading, error } = useQuery({ queryKey: ["overview"], queryFn: () => overviewFn() });
 
   const [form, setForm] = useState<any>(null);
   const [keywordsText, setKeywordsText] = useState("");
@@ -35,24 +47,19 @@ function AiSettingsPage() {
   const [testOutput, setTestOutput] = useState("");
 
   useEffect(() => {
-    if (data?.aiSettings && !form) {
-      setForm(data.aiSettings);
-      setKeywordsText((data.aiSettings.comment_trigger_keywords ?? []).join(", "));
-    } else if (data && !data.aiSettings && !form) {
-      setForm({
-        provider: "lovable",
-        model: "google/gemini-3-flash-preview",
-        api_key: null,
-        system_instructions: "You are a friendly Bengali/English sales agent. Reply in the same language as the customer.",
-        language_mode: "auto",
-        auto_reply_messages: true,
-        auto_reply_comments: true,
-        auto_hide_abusive: true,
-        comment_trigger_keywords: ["price", "দাম", "details", "বিস্তারিত", "inbox", "order"],
-      });
-      setKeywordsText("price, দাম, details, বিস্তারিত, inbox, order");
-    }
+    if (!data || form) return;
+    const initial = data.aiSettings ?? DEFAULT_FORM;
+    setForm(initial);
+    setKeywordsText((initial.comment_trigger_keywords ?? []).join(", "));
   }, [data, form]);
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+        Failed to load AI settings: {(error as Error).message}
+      </div>
+    );
+  }
 
   const save = useMutation({
     mutationFn: () => saveFn({ data: {
@@ -69,7 +76,7 @@ function AiSettingsPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  if (!form) return <div className="text-muted-foreground">Loading…</div>;
+  if (isLoading || !form) return <div className="text-muted-foreground">Loading…</div>;
 
   return (
     <div className="space-y-6 max-w-4xl">
