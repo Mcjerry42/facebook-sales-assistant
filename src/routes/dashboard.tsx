@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
-import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles } from "lucide-react";
+import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet as SheetUI, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -38,6 +38,7 @@ const nav = [
   { to: "/dashboard/sheets", label: "Google Sheets", icon: Sheet },
   { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/dashboard/connect", label: "Facebook & API", icon: Settings },
+  { to: "/dashboard/admin", label: "Admin Controls", icon: ShieldCheck },
 ];
 
 function DashboardLayout() {
