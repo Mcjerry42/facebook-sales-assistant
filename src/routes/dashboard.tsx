@@ -57,10 +57,14 @@ function DashboardLayout() {
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event === "SIGNED_OUT" || !s?.user) navigate({ to: "/login", replace: true });
+      // Only react to explicit sign-out. INITIAL_SESSION / TOKEN_REFRESHED
+      // can briefly fire with a transient null session and cause flash redirects.
+      if (event === "SIGNED_OUT") navigate({ to: "/login", replace: true });
+      else if (s?.user) setUser(s.user);
     });
     return () => { mounted = false; subscription.unsubscribe(); };
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
