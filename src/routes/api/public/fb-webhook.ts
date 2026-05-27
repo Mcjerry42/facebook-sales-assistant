@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { metapilotSupabaseAdmin } from "@/lib/metapilot-supabase.server";
 import { tryExtractAndSaveOrder } from "@/lib/order-extractor.server";
 
 export const Route = createFileRoute("/api/public/fb-webhook")({
