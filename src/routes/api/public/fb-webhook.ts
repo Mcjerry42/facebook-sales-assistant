@@ -286,60 +286,142 @@ async function handleFeedChange(change: any, pageId: string) {
 
   if (settings && settings.auto_reply_comments === false) return;
 
-  // Generate reply
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey) return;
+
   const { data: kb } = await supabaseAdmin
     .from("knowledge_entries")
     .select("question,answer,category")
     .limit(200);
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return;
 
   const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
-  const { generateText } = await import("ai");
+  const { generateText, Output } = await import("ai");
+  const { z } = await import("zod");
   const gateway = createLovableAiGatewayProvider(apiKey);
   const model = gateway(settings?.model ?? "google/gemini-3-flash-preview");
   const kbText = (kb ?? []).map((k: any) => `Q: ${k.question}\nA: ${k.answer}`).join("\n---\n");
-  const system = `${settings?.system_instructions ?? ""}\n\nYou are replying to a public Facebook comment. Keep replies short (1-2 sentences), warm, in the same language the commenter used. If they ask price/details/order, invite them to inbox.\n\nKnowledge Base:\n${kbText || "(empty)"}`;
 
-  let replyText = "";
+  const system = `${settings?.system_instructions ?? ""}
+
+You are moderating a Facebook page. For each public comment you receive, output STRICT JSON with:
+- is_abusive: true if the comment is hateful, abusive, spam, scam, sexual harassment, or clearly off-topic trolling. Otherwise false. A simple greeting like "hi" is NOT abusive.
+- public_reply: a short (1-2 sentences) warm public reply in the commenter's language. If they asked about price/details/order, invite them to inbox. Leave empty string if is_abusive is true.
+- private_message: a friendlier longer DM (2-4 sentences) sent privately to the same commenter. Greet by name if available. Answer their question using the Knowledge Base. If they showed buying intent, ask for product, quantity, name, phone, address. Leave empty string if is_abusive is true.
+
+Knowledge Base:
+${kbText || "(empty)"}`;
+
+  let aiOut: { is_abusive: boolean; public_reply: string; private_message: string } | null = null;
   try {
     const result = await generateText({
       model,
       system,
-      prompt: `Comment: ${text || "(no text)"}\nReply:`,
+      prompt: `Commenter name: ${fromName ?? "Unknown"}\nComment: ${text || "(no text)"}`,
+      output: Output.object({
+        schema: z.object({
+          is_abusive: z.boolean(),
+          public_reply: z.string(),
+          private_message: z.string(),
+        }),
+      }),
     });
-    replyText = result.text?.trim() ?? "";
+    aiOut = (result as any).output ?? null;
   } catch (err) {
     console.error("comment AI failed", err);
     return;
   }
-  if (!replyText) return;
+  if (!aiOut) return;
 
-  // Reply to the comment
-  const replyRes = await fetch(
-    `https://graph.facebook.com/v21.0/${commentId}/comments?access_token=${encodeURIComponent(cfg.page_access_token)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: replyText }),
-    },
-  );
-  if (!replyRes.ok) {
-    const errText = await replyRes.text();
-    await supabaseAdmin.from("analytics_events").insert({
-      event_type: "fb_comment_reply_failed",
-      meta: { status: replyRes.status, body: errText, post_id: postId },
-    });
+  const token = cfg.page_access_token;
+
+  // Abusive → hide (and optionally delete). Don't reply.
+  if (aiOut.is_abusive) {
+    if (settings?.auto_hide_abusive !== false) {
+      const hideRes = await fetch(
+        `https://graph.facebook.com/v21.0/${commentId}?access_token=${encodeURIComponent(token)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_hidden: true }),
+        },
+      );
+      if (hideRes.ok) {
+        await supabaseAdmin
+          .from("comments")
+          .update({ action: "hidden", hidden: true })
+          .eq("comment_id", commentId);
+        await supabaseAdmin.from("analytics_events").insert({
+          event_type: "fb_comment_hidden",
+          meta: { post_id: postId, comment_id: commentId },
+        });
+      } else {
+        const errText = await hideRes.text();
+        await supabaseAdmin.from("analytics_events").insert({
+          event_type: "fb_comment_hide_failed",
+          meta: { status: hideRes.status, body: errText, comment_id: commentId },
+        });
+      }
+    }
     return;
   }
 
-  await supabaseAdmin
-    .from("comments")
-    .update({ action: "replied" })
-    .eq("comment_id", commentId);
+  // Public reply on the comment thread.
+  if (aiOut.public_reply?.trim()) {
+    const replyRes = await fetch(
+      `https://graph.facebook.com/v21.0/${commentId}/comments?access_token=${encodeURIComponent(token)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: aiOut.public_reply.trim() }),
+      },
+    );
+    if (!replyRes.ok) {
+      const errText = await replyRes.text();
+      await supabaseAdmin.from("analytics_events").insert({
+        event_type: "fb_comment_reply_failed",
+        meta: { status: replyRes.status, body: errText, post_id: postId },
+      });
+    } else {
+      await supabaseAdmin
+        .from("comments")
+        .update({ action: "replied" })
+        .eq("comment_id", commentId);
+      await supabaseAdmin.from("analytics_events").insert({
+        event_type: "fb_comment_replied",
+        meta: { post_id: postId, comment_id: commentId },
+      });
+    }
+  }
 
-  await supabaseAdmin.from("analytics_events").insert({
-    event_type: "fb_comment_replied",
-    meta: { post_id: postId, comment_id: commentId },
-  });
+  // Private reply (DM) to the same commenter via the comment id.
+  if (aiOut.private_message?.trim()) {
+    const pmRes = await fetch(
+      `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(token)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipient: { comment_id: commentId },
+          message: { text: aiOut.private_message.trim() },
+          messaging_type: "RESPONSE",
+        }),
+      },
+    );
+    if (!pmRes.ok) {
+      const errText = await pmRes.text();
+      await supabaseAdmin.from("analytics_events").insert({
+        event_type: "fb_comment_dm_failed",
+        meta: { status: pmRes.status, body: errText, comment_id: commentId },
+      });
+    } else {
+      await supabaseAdmin
+        .from("comments")
+        .update({ dm_sent: true })
+        .eq("comment_id", commentId);
+      await supabaseAdmin.from("analytics_events").insert({
+        event_type: "fb_comment_dm_sent",
+        meta: { comment_id: commentId },
+      });
+    }
+  }
 }
