@@ -1,7 +1,7 @@
 import { createMiddleware } from "@tanstack/react-start";
-import { metapilotSupabase } from "@/lib/metapilot-supabase.client";
 
 export const attachMetapilotAuth = createMiddleware({ type: "function" }).client(async ({ next }) => {
+  const { metapilotSupabase } = await import("@/lib/metapilot-supabase.client");
   const { data } = await metapilotSupabase.auth.getSession();
   const token = data.session?.access_token;
 
