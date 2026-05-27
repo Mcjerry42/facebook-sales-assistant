@@ -265,3 +265,43 @@ export const saveOrdersSheet = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+export const testOrdersSheet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    await assertAdmin(supabase, userId);
+    const { data: cfg } = await supabase
+      .from("sheets_config")
+      .select("orders_sheet_url")
+      .limit(1)
+      .maybeSingle();
+    const url = cfg?.orders_sheet_url;
+    if (!url) throw new Error("Save an Apps Script URL first");
+    const sample = {
+      id: "test-" + Date.now(),
+      created_at: new Date().toISOString(),
+      customer_name: "Test Customer",
+      phone: "01700000000",
+      address: "Test address, Dhaka",
+      items: [{ name: "Sample Product", quantity: 1, price: 100 }],
+      total: 100,
+      status: "pending",
+      notes: "Test row from MetaPilot",
+    };
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sample),
+      });
+    } catch (err: any) {
+      throw new Error("Network error: " + (err?.message ?? String(err)));
+    }
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`Apps Script returned ${res.status}: ${text.slice(0, 300)}`);
+    }
+    return { ok: true, status: res.status, response: text.slice(0, 500) };
+  });

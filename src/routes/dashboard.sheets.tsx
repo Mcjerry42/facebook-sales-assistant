@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { getDashboardOverview, connectSheet, saveOrdersSheet } from "@/lib/dashboard.functions";
+import { getDashboardOverview, connectSheet, saveOrdersSheet, testOrdersSheet } from "@/lib/dashboard.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ function Sheets() {
   const overviewFn = useServerFn(getDashboardOverview);
   const connectFn = useServerFn(connectSheet);
   const saveOrdersFn = useServerFn(saveOrdersSheet);
+  const testOrdersFn = useServerFn(testOrdersSheet);
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["overview"], queryFn: () => overviewFn() });
   const cfg = data?.sheetsConfig;
@@ -39,6 +40,11 @@ function Sheets() {
   const saveOrders = useMutation({
     mutationFn: () => saveOrdersFn({ data: { orders_sheet_url: ordersUrl || null } }),
     onSuccess: () => { toast.success("Orders sheet URL saved"); qc.invalidateQueries({ queryKey: ["overview"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const testOrders = useMutation({
+    mutationFn: () => testOrdersFn(),
+    onSuccess: (r: any) => toast.success(`Test row sent (${r.status}). Check your sheet.`),
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -85,25 +91,61 @@ function Sheets() {
         </div>
         <details className="text-xs text-muted-foreground rounded border border-border/40 p-3">
           <summary className="cursor-pointer font-medium">Show Apps Script template</summary>
-          <pre className="mt-2 overflow-auto text-[11px] leading-relaxed">{`function doPost(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Orders")
-    || SpreadsheetApp.getActiveSpreadsheet().insertSheet("Orders");
-  const o = JSON.parse(e.postData.contents);
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["ID","Created","Name","Phone","Address","Items","Total","Status","Notes"]);
+          <pre className="mt-2 overflow-auto text-[11px] leading-relaxed">{`function doGet() {
+  return ContentService.createTextOutput("MetaPilot webhook is live");
+}
+
+function doPost(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Orders") || ss.insertSheet("Orders");
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["ID","Created","Name","Phone","Address","Items","Total","Status","Notes"]);
+    }
+    var o = JSON.parse(e.postData.contents);
+    sheet.appendRow([
+      o.id, o.created_at, o.customer_name, o.phone, o.address,
+      JSON.stringify(o.items), o.total, o.status, o.notes || ""
+    ]);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-  sheet.appendRow([o.id, o.created_at, o.customer_name, o.phone, o.address, JSON.stringify(o.items), o.total, o.status, o.notes || ""]);
-  return ContentService.createTextOutput("ok");
 }`}</pre>
-          <p className="mt-2">Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone → Copy URL.</p>
+          <ol className="mt-2 list-decimal list-inside space-y-1">
+            <li>Open your Google Sheet → Extensions → Apps Script.</li>
+            <li>Paste the code above, save (Ctrl/Cmd+S).</li>
+            <li>Click <b>Deploy → New deployment</b>. Gear icon → <b>Web app</b>.</li>
+            <li>Execute as: <b>Me</b> · Who has access: <b>Anyone</b> → Deploy.</li>
+            <li>Authorize when prompted, then copy the Web app URL.</li>
+          </ol>
         </details>
         <div>
           <Label>Apps Script Web App URL</Label>
           <Input value={ordersUrl} onChange={(e) => setOrdersUrl(e.target.value)} placeholder="https://script.google.com/macros/s/..../exec" />
         </div>
-        <Button onClick={() => saveOrders.mutate()} disabled={saveOrders.isPending} variant="secondary">
-          {saveOrders.isPending ? "Saving…" : "Save"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => saveOrders.mutate()} disabled={saveOrders.isPending} variant="secondary">
+            {saveOrders.isPending ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => testOrders.mutate()}
+            disabled={!ordersUrl || testOrders.isPending}
+          >
+            {testOrders.isPending ? "Sending…" : "Send test row"}
+          </Button>
+        </div>
+        {(cfg as any)?.orders_last_synced_at && (
+          <p className="text-xs text-muted-foreground">
+            Last order synced: {new Date((cfg as any).orders_last_synced_at).toLocaleString()}
+          </p>
+        )}
       </Card>
     </div>
   );
