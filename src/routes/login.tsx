@@ -16,6 +16,7 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
@@ -29,32 +30,53 @@ function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMessage(null);
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email, password,
           options: { emailRedirectTo: window.location.origin + "/dashboard" },
         });
         if (error) throw error;
-        toast.success("Check your email to confirm your account");
+        if (data.session?.user) {
+          toast.success("Account created");
+          setMessage({ type: "success", text: "Account created. Opening dashboard…" });
+          navigate({ to: "/dashboard", replace: true });
+        } else {
+          toast.success("Account created");
+          setMessage({ type: "success", text: "Account created. Please sign in now." });
+          setMode("signin");
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (!data.session?.user) throw new Error("Sign in did not return a session. Please try again.");
+        toast.success("Signed in");
+        setMessage({ type: "success", text: "Signed in. Opening dashboard…" });
+        navigate({ to: "/dashboard", replace: true });
       }
     } catch (err: any) {
-      toast.error(err.message ?? "Authentication failed");
+      const text = err?.message ?? "Authentication failed";
+      toast.error(text);
+      setMessage({ type: "error", text });
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
+    setMessage({ type: "info", text: "Opening Google sign-in…" });
     try {
       const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/dashboard" });
-      if (result?.error) toast.error("Google sign-in failed");
+      if (result?.error) {
+        toast.error("Google sign-in failed");
+        setMessage({ type: "error", text: "Google sign-in failed. Please try email/password." });
+      }
     } catch (err: any) {
-      toast.error(err?.message ?? "Google sign-in failed");
+      const text = err?.message ?? "Google sign-in failed";
+      toast.error(text);
+      setMessage({ type: "error", text });
     }
   };
 
@@ -91,6 +113,12 @@ function LoginPage() {
             {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </Button>
         </form>
+
+        {message && (
+          <div className={`mt-4 rounded-lg border px-3 py-2 text-sm ${message.type === "error" ? "border-destructive/50 bg-destructive/10 text-destructive-foreground" : "border-border bg-secondary text-secondary-foreground"}`}>
+            {message.text}
+          </div>
+        )}
 
         <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="mt-4 w-full text-sm text-muted-foreground hover:text-foreground">
           {mode === "signin" ? "No account? Sign up" : "Already have an account? Sign in"}
