@@ -1,8 +1,9 @@
 import { createMiddleware } from "@tanstack/react-start";
+import { getRequestHeader } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
-export const requireMetapilotAuth = createMiddleware({ type: "function" }).server(async ({ next, request }) => {
+export const requireMetapilotAuth = createMiddleware({ type: "function" }).server(async ({ next }) => {
   const url = process.env.METAPILOT_SUPABASE_URL;
   const publishableKey = process.env.METAPILOT_SUPABASE_ANON_KEY;
 
@@ -15,7 +16,7 @@ export const requireMetapilotAuth = createMiddleware({ type: "function" }).serve
     );
   }
 
-  const authHeader = request.headers.get("Authorization");
+  const authHeader = getRequestHeader("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     throw new Response("Unauthorized", { status: 401 });
   }
