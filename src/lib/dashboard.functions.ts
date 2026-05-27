@@ -86,6 +86,7 @@ const FbConfigSchema = z.object({
   page_access_token: z.string().max(1000).nullable().optional(),
   verify_token: z.string().max(200).nullable().optional(),
   app_secret: z.string().max(500).nullable().optional(),
+  monitored_post_ids: z.array(z.string().min(1).max(100)).max(100).optional(),
 });
 
 export const saveFbConfig = createServerFn({ method: "POST" })
