@@ -53,14 +53,6 @@ function AiSettingsPage() {
     setKeywordsText((initial.comment_trigger_keywords ?? []).join(", "));
   }, [data, form]);
 
-  if (error) {
-    return (
-      <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-        Failed to load AI settings: {(error as Error).message}
-      </div>
-    );
-  }
-
   const save = useMutation({
     mutationFn: () => saveFn({ data: {
       ...form,
@@ -75,6 +67,14 @@ function AiSettingsPage() {
     onSuccess: (r) => setTestOutput(r.text),
     onError: (e: any) => toast.error(e.message),
   });
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+        Failed to load AI settings: {(error as Error).message}
+      </div>
+    );
+  }
 
   if (isLoading || !form) return <div className="text-muted-foreground">Loading…</div>;
 
