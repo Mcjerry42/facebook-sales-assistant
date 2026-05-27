@@ -117,9 +117,14 @@ function RootComponent() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      // Only invalidate on actual sign-in / sign-out to avoid an infinite
-      // loop with INITIAL_SESSION / TOKEN_REFRESHED firing on every fetch.
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+      // Avoid an infinite loop with INITIAL_SESSION / TOKEN_REFRESHED firing on every fetch.
+      if (event === "SIGNED_OUT") {
+        // Clear cached queries instead of invalidating — invalidation would
+        // immediately refetch protected server fns with no bearer token and
+        // surface a "Unauthorized" error before the redirect to /login runs.
+        queryClient.clear();
+        router.invalidate();
+      } else if (event === "SIGNED_IN") {
         router.invalidate();
         queryClient.invalidateQueries();
       }
