@@ -29,7 +29,7 @@ function ConnectPage() {
       page_access_token: cfg.page_access_token ?? "",
       verify_token: cfg.verify_token ?? "lovable_fb_verify_token",
       app_secret: cfg.app_secret ?? "",
-      monitored_post_ids: Array.isArray(cfg.monitored_post_ids) ? cfg.monitored_post_ids : [],
+      monitored_post_ids: Array.isArray((cfg as any).monitored_post_ids) ? (cfg as any).monitored_post_ids : [],
     });
   }, [cfg]);
 
