@@ -5,8 +5,14 @@ import { z } from "zod";
 type DbError = { message: string } | null;
 type RoleSelector = {
   select: (columns: string) => {
-    eq: (column: string, value: string) => {
-      eq: (column: string, value: string) => {
+    eq: (
+      column: string,
+      value: string,
+    ) => {
+      eq: (
+        column: string,
+        value: string,
+      ) => {
         maybeSingle: () => PromiseLike<{ data: unknown; error: DbError }>;
       };
     };
