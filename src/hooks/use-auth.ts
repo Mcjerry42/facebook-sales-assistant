@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { metapilotSupabase } from "@/lib/metapilot-supabase.client";
+import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
 import type { Session, User } from "@supabase/supabase-js";
 
 export function useAuth() {

@@ -8,7 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { metapilotSupabase } from "@/lib/metapilot-supabase.client";
+import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";

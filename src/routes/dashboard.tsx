@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { metapilotSupabase } from "@/lib/metapilot-supabase.client";
+import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
 import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
