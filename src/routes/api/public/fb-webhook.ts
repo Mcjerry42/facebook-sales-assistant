@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/public/fb-webhook")({
         const mode = url.searchParams.get("hub.mode");
         const token = url.searchParams.get("hub.verify_token");
         const challenge = url.searchParams.get("hub.challenge");
-        const { data } = await supabaseAdmin.from("fb_config").select("verify_token").limit(1).maybeSingle();
+        const { data } = await metapilotSupabaseAdmin.from("fb_config").select("verify_token").limit(1).maybeSingle();
         const expected = data?.verify_token ?? "lovable_fb_verify_token";
         if (mode === "subscribe" && token === expected) {
           return new Response(challenge ?? "", { status: 200 });
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/public/fb-webhook")({
       POST: async ({ request }) => {
         try {
           const body = await request.json();
-          await supabaseAdmin.from("analytics_events").insert({
+          await metapilotSupabaseAdmin.from("analytics_events").insert({
             event_type: "fb_webhook_received",
             meta: body,
           });
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/api/public/fb-webhook")({
                   await handleMessagingEvent(ev, entry.id);
                 } catch (err) {
                   console.error("handleMessagingEvent error", err);
-                  await supabaseAdmin.from("analytics_events").insert({
+                  await metapilotSupabaseAdmin.from("analytics_events").insert({
                     event_type: "fb_webhook_error",
                     meta: { error: String(err), event: ev },
                   });
@@ -44,7 +44,7 @@ export const Route = createFileRoute("/api/public/fb-webhook")({
                   await handleFeedChange(ch, entry.id);
                 } catch (err) {
                   console.error("handleFeedChange error", err);
-                  await supabaseAdmin.from("analytics_events").insert({
+                  await metapilotSupabaseAdmin.from("analytics_events").insert({
                     event_type: "fb_webhook_error",
                     meta: { error: String(err), change: ch },
                   });
@@ -68,7 +68,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   if (!senderId || !text || isEcho) return;
   if (senderId === pageId) return;
 
-  const { data: cfg } = await supabaseAdmin
+  const { data: cfg } = await metapilotSupabaseAdmin
     .from("fb_config")
     .select("page_access_token, page_id")
     .limit(1)
@@ -78,14 +78,14 @@ async function handleMessagingEvent(ev: any, pageId: string) {
     return;
   }
 
-  const { data: settings } = await supabaseAdmin
+  const { data: settings } = await metapilotSupabaseAdmin
     .from("ai_settings")
     .select("*")
     .limit(1)
     .maybeSingle();
 
   // Find or create conversation
-  let { data: conv } = await supabaseAdmin
+  let { data: conv } = await metapilotSupabaseAdmin
     .from("conversations")
     .select("*")
     .eq("fb_user_id", senderId)
@@ -104,7 +104,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
         fbUserAvatar = prof.profile_pic ?? null;
       }
     } catch {}
-    const { data: created } = await supabaseAdmin
+    const { data: created } = await metapilotSupabaseAdmin
       .from("conversations")
       .insert({
         fb_user_id: senderId,
@@ -118,7 +118,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
       .single();
     conv = created!;
   } else {
-    await supabaseAdmin
+    await metapilotSupabaseAdmin
       .from("conversations")
       .update({
         last_message: text,
@@ -129,7 +129,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   }
 
   // Save inbound message
-  await supabaseAdmin.from("messages").insert({
+  await metapilotSupabaseAdmin.from("messages").insert({
     conversation_id: conv.id,
     sender: "user",
     text,
@@ -141,12 +141,12 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   if (settings && settings.auto_reply_messages === false) return;
 
   // Load knowledge base (recent history is also nice but keep it simple)
-  const { data: kb } = await supabaseAdmin
+  const { data: kb } = await metapilotSupabaseAdmin
     .from("knowledge_entries")
     .select("question,answer,category")
     .limit(200);
 
-  const { data: history } = await supabaseAdmin
+  const { data: history } = await metapilotSupabaseAdmin
     .from("messages")
     .select("sender,text,is_ai,created_at")
     .eq("conversation_id", conv.id)
@@ -202,20 +202,20 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   if (!sendRes.ok) {
     const errText = await sendRes.text();
     console.error("FB send failed", sendRes.status, errText);
-    await supabaseAdmin.from("analytics_events").insert({
+    await metapilotSupabaseAdmin.from("analytics_events").insert({
       event_type: "fb_send_failed",
       meta: { status: sendRes.status, body: errText },
     });
     return;
   }
 
-  await supabaseAdmin.from("messages").insert({
+  await metapilotSupabaseAdmin.from("messages").insert({
     conversation_id: conv.id,
     sender: "ai",
     text: replyText,
     is_ai: true,
   });
-  await supabaseAdmin
+  await metapilotSupabaseAdmin
     .from("conversations")
     .update({
       last_message: replyText,
@@ -250,7 +250,7 @@ async function handleFeedChange(change: any, pageId: string) {
   // Skip our own page's comments
   if (fromId && fromId === pageId) return;
 
-  const { data: cfg } = await supabaseAdmin
+  const { data: cfg } = await metapilotSupabaseAdmin
     .from("fb_config")
     .select("page_access_token, monitored_post_ids")
     .limit(1)
@@ -261,21 +261,21 @@ async function handleFeedChange(change: any, pageId: string) {
   // Match either the full post_id ("pageId_postId") or just the suffix.
   const isMonitored = monitored.some((m) => postId === m || postId.endsWith("_" + m) || m.endsWith("_" + postId.split("_").pop()));
   if (!isMonitored) {
-    await supabaseAdmin.from("analytics_events").insert({
+    await metapilotSupabaseAdmin.from("analytics_events").insert({
       event_type: "fb_comment_skipped",
       meta: { post_id: postId, reason: "not_monitored" },
     });
     return;
   }
 
-  const { data: settings } = await supabaseAdmin
+  const { data: settings } = await metapilotSupabaseAdmin
     .from("ai_settings")
     .select("*")
     .limit(1)
     .maybeSingle();
 
   // Record the comment
-  await supabaseAdmin.from("comments").insert({
+  await metapilotSupabaseAdmin.from("comments").insert({
     comment_id: commentId,
     post_id: postId,
     commenter_id: fromId ?? null,
@@ -289,7 +289,7 @@ async function handleFeedChange(change: any, pageId: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return;
 
-  const { data: kb } = await supabaseAdmin
+  const { data: kb } = await metapilotSupabaseAdmin
     .from("knowledge_entries")
     .select("question,answer,category")
     .limit(200);
@@ -346,17 +346,17 @@ ${kbText || "(empty)"}`;
         },
       );
       if (hideRes.ok) {
-        await supabaseAdmin
+        await metapilotSupabaseAdmin
           .from("comments")
           .update({ action: "hidden", hidden: true })
           .eq("comment_id", commentId);
-        await supabaseAdmin.from("analytics_events").insert({
+        await metapilotSupabaseAdmin.from("analytics_events").insert({
           event_type: "fb_comment_hidden",
           meta: { post_id: postId, comment_id: commentId },
         });
       } else {
         const errText = await hideRes.text();
-        await supabaseAdmin.from("analytics_events").insert({
+        await metapilotSupabaseAdmin.from("analytics_events").insert({
           event_type: "fb_comment_hide_failed",
           meta: { status: hideRes.status, body: errText, comment_id: commentId },
         });
@@ -377,16 +377,16 @@ ${kbText || "(empty)"}`;
     );
     if (!replyRes.ok) {
       const errText = await replyRes.text();
-      await supabaseAdmin.from("analytics_events").insert({
+      await metapilotSupabaseAdmin.from("analytics_events").insert({
         event_type: "fb_comment_reply_failed",
         meta: { status: replyRes.status, body: errText, post_id: postId },
       });
     } else {
-      await supabaseAdmin
+      await metapilotSupabaseAdmin
         .from("comments")
         .update({ action: "replied" })
         .eq("comment_id", commentId);
-      await supabaseAdmin.from("analytics_events").insert({
+      await metapilotSupabaseAdmin.from("analytics_events").insert({
         event_type: "fb_comment_replied",
         meta: { post_id: postId, comment_id: commentId },
       });
@@ -409,16 +409,16 @@ ${kbText || "(empty)"}`;
     );
     if (!pmRes.ok) {
       const errText = await pmRes.text();
-      await supabaseAdmin.from("analytics_events").insert({
+      await metapilotSupabaseAdmin.from("analytics_events").insert({
         event_type: "fb_comment_dm_failed",
         meta: { status: pmRes.status, body: errText, comment_id: commentId },
       });
     } else {
-      await supabaseAdmin
+      await metapilotSupabaseAdmin
         .from("comments")
         .update({ dm_sent: true })
         .eq("comment_id", commentId);
-      await supabaseAdmin.from("analytics_events").insert({
+      await metapilotSupabaseAdmin.from("analytics_events").insert({
         event_type: "fb_comment_dm_sent",
         meta: { comment_id: commentId },
       });
