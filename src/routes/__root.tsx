@@ -8,7 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
+import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
@@ -78,11 +78,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "MetaPilot AI — Facebook Automation for Business" },
       { name: "description", content: "AI-powered Facebook Messenger and comment automation in Bengali and English. Auto-reply, order capture, and Google Sheets knowledge base." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "MetaPilot AI" },
-      { property: "og:description", content: "AI-powered Facebook automation in Bengali and English." },
+      { property: "og:title", content: "MetaPilot AI — Facebook Automation for Business" },
+      { property: "og:description", content: "AI-powered Facebook Messenger and comment automation in Bengali and English. Auto-reply, order capture, and Google Sheets knowledge base." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "MetaPilot AI — Facebook Automation for Business" },
+      { name: "twitter:description", content: "AI-powered Facebook Messenger and comment automation in Bengali and English. Auto-reply, order capture, and Google Sheets knowledge base." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fb89d010-932d-43f7-9883-01da54ca5e37/id-preview-55977257--5c37c6b8-2d4f-4901-bfe7-810baaba3f65.lovable.app-1779905047783.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fb89d010-932d-43f7-9883-01da54ca5e37/id-preview-55977257--5c37c6b8-2d4f-4901-bfe7-810baaba3f65.lovable.app-1779905047783.png" },
     ],
     links: [
       {
@@ -116,7 +120,7 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: { subscription } } = metapilotSupabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       // Avoid an infinite loop with INITIAL_SESSION / TOKEN_REFRESHED firing on every fetch.
       if (event === "SIGNED_OUT") {
         // Clear cached queries instead of invalidating — invalidation would
