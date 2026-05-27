@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { metapilotSupabase } from "@/lib/metapilot-supabase.client";
 import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ function DashboardLayout() {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
+    metapilotSupabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       if (!data.session?.user) {
         navigate({ to: "/login", replace: true });
@@ -57,7 +57,7 @@ function DashboardLayout() {
         setChecking(false);
       }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+    const { data: { subscription } } = metapilotSupabase.auth.onAuthStateChange((event, s) => {
       // Only react to explicit sign-out. INITIAL_SESSION / TOKEN_REFRESHED
       // can briefly fire with a transient null session and cause flash redirects.
       if (event === "SIGNED_OUT") navigate({ to: "/login", replace: true });
@@ -70,7 +70,7 @@ function DashboardLayout() {
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await metapilotSupabase.auth.signOut();
     navigate({ to: "/login" });
   };
 
