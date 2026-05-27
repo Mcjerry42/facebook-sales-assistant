@@ -79,6 +79,7 @@ export type Database = {
       }
       app_settings: {
         Row: {
+          duration_days: number
           id: string
           package_name: string
           paywall_message: string
@@ -88,6 +89,7 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          duration_days?: number
           id?: string
           package_name?: string
           paywall_message?: string
@@ -97,6 +99,7 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          duration_days?: number
           id?: string
           package_name?: string
           paywall_message?: string
@@ -335,6 +338,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approved_until: string | null
           avatar_url: string | null
           created_at: string
           email: string | null
@@ -343,6 +347,7 @@ export type Database = {
           is_approved: boolean
         }
         Insert: {
+          approved_until?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -351,6 +356,7 @@ export type Database = {
           is_approved?: boolean
         }
         Update: {
+          approved_until?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
