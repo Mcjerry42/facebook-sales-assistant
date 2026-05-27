@@ -31,12 +31,6 @@ async function assertAdmin(supabase: RoleClient, userId: string) {
   if (error || !data) throw new Error("Forbidden: admin role required");
 }
 
-type SupabaseTableReader = {
-  from: (table: string) => {
-    select: (columns: string) => unknown;
-  };
-};
-
 export const getDashboardOverview = createServerFn({ method: "GET" })
   .middleware([requireMetapilotAuth])
   .handler(async ({ context }) => {
