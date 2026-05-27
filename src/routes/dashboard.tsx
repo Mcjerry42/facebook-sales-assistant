@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet as SheetUI, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
+import { FullPageLoader } from "@/components/page-loader";
 
 export const Route = createFileRoute("/dashboard")({
   // Auth lives in localStorage — render entirely on the client to avoid
@@ -74,11 +75,7 @@ function DashboardLayout() {
   };
 
   if (checking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "var(--gradient-hero)" }}>
-        <div className="text-sm text-muted-foreground">Loading…</div>
-      </div>
-    );
+    return <FullPageLoader label="Preparing your dashboard" />;
   }
 
   const SidebarContent = () => (

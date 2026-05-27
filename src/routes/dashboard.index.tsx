@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getDashboardOverview } from "@/lib/dashboard.functions";
 import { Card } from "@/components/ui/card";
 import { MessageSquare, ShoppingBag, MessageCircle, Brain, Sheet, CheckCircle2, XCircle } from "lucide-react";
+import { PageLoader } from "@/components/page-loader";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
 
@@ -24,7 +25,7 @@ function Overview() {
   const fn = useServerFn(getDashboardOverview);
   const { data, isLoading } = useQuery({ queryKey: ["overview"], queryFn: () => fn() });
 
-  if (isLoading) return <div className="text-muted-foreground">Loading dashboard…</div>;
+  if (isLoading) return <PageLoader label="Loading dashboard" />;
 
   const fb = data?.fbConfig?.connected;
   const sheets = data?.sheetsConfig?.connected;
