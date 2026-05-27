@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireMetapilotAuth } from "@/lib/metapilot-auth-middleware";
 import { z } from "zod";
 
 async function assertAdmin(supabase: any, userId: string) {
@@ -13,7 +13,7 @@ async function assertAdmin(supabase: any, userId: string) {
 }
 
 export const getDashboardOverview = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
@@ -38,7 +38,7 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
   });
 
 export const getMessages = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .inputValidator((d: { conversationId: string }) => d)
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
@@ -64,7 +64,7 @@ const AiSettingsSchema = z.object({
 });
 
 export const saveAiSettings = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .inputValidator((input: unknown) => AiSettingsSchema.parse(input))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
@@ -90,7 +90,7 @@ const FbConfigSchema = z.object({
 });
 
 export const saveFbConfig = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .inputValidator((input: unknown) => FbConfigSchema.parse(input))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
@@ -118,7 +118,7 @@ function extractSheetId(url: string): string | null {
 }
 
 export const connectSheet = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .inputValidator((input: unknown) => SheetsSchema.parse(input))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
@@ -194,7 +194,7 @@ function parseCsv(text: string): string[][] {
 }
 
 export const askAi = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .inputValidator((d: unknown) => z.object({ message: z.string().min(1).max(2000) }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
@@ -221,7 +221,7 @@ export const askAi = createServerFn({ method: "POST" })
   });
 
 export const toggleHumanTakeover = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .inputValidator((d: unknown) => z.object({ conversationId: z.string().uuid(), enabled: z.boolean() }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
@@ -232,7 +232,7 @@ export const toggleHumanTakeover = createServerFn({ method: "POST" })
   });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), status: z.enum(["pending", "confirmed", "shipped", "delivered", "cancelled"]) }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
@@ -243,7 +243,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   });
 
 export const saveOrdersSheet = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .inputValidator((d: unknown) =>
     z.object({ orders_sheet_url: z.string().url().max(500).nullable().optional() }).parse(d),
   )
@@ -267,7 +267,7 @@ export const saveOrdersSheet = createServerFn({ method: "POST" })
   });
 
 export const testOrdersSheet = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireMetapilotAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
