@@ -241,3 +241,27 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const saveOrdersSheet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ orders_sheet_url: z.string().url().max(500).nullable().optional() }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    await assertAdmin(supabase, userId);
+    const { data: existing } = await supabase.from("sheets_config").select("id").limit(1).maybeSingle();
+    if (existing) {
+      const { error } = await supabase
+        .from("sheets_config")
+        .update({ orders_sheet_url: data.orders_sheet_url ?? null, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase
+        .from("sheets_config")
+        .insert({ orders_sheet_url: data.orders_sheet_url ?? null });
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
