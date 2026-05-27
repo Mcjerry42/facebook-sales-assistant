@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { tryExtractAndSaveOrder } from "@/lib/order-extractor.server";
 
 export const Route = createFileRoute("/api/public/fb-webhook")({
   server: {
@@ -34,6 +35,18 @@ export const Route = createFileRoute("/api/public/fb-webhook")({
                   await supabaseAdmin.from("analytics_events").insert({
                     event_type: "fb_webhook_error",
                     meta: { error: String(err), event: ev },
+                  });
+                }
+              }
+              const changes = entry.changes ?? [];
+              for (const ch of changes) {
+                try {
+                  await handleFeedChange(ch, entry.id);
+                } catch (err) {
+                  console.error("handleFeedChange error", err);
+                  await supabaseAdmin.from("analytics_events").insert({
+                    event_type: "fb_webhook_error",
+                    meta: { error: String(err), change: ch },
                   });
                 }
               }
@@ -210,4 +223,123 @@ async function handleMessagingEvent(ev: any, pageId: string) {
       unread_count: 0,
     })
     .eq("id", conv.id);
+
+  // Best-effort: try to extract a completed order from the conversation.
+  try {
+    await tryExtractAndSaveOrder({
+      conversationId: conv.id,
+      model: settings?.model ?? "google/gemini-3-flash-preview",
+    });
+  } catch (err) {
+    console.error("order extraction error", err);
+  }
+}
+
+async function handleFeedChange(change: any, pageId: string) {
+  if (change?.field !== "feed") return;
+  const v = change.value ?? {};
+  if (v.item !== "comment") return;
+  if (v.verb !== "add") return; // only new comments
+
+  const commentId: string | undefined = v.comment_id;
+  const postId: string | undefined = v.post_id;
+  const text: string = v.message ?? "";
+  const fromId: string | undefined = v.from?.id;
+  const fromName: string | undefined = v.from?.name;
+  if (!commentId || !postId) return;
+  // Skip our own page's comments
+  if (fromId && fromId === pageId) return;
+
+  const { data: cfg } = await supabaseAdmin
+    .from("fb_config")
+    .select("page_access_token, monitored_post_ids")
+    .limit(1)
+    .maybeSingle();
+  if (!cfg?.page_access_token) return;
+
+  const monitored: string[] = cfg.monitored_post_ids ?? [];
+  // Match either the full post_id ("pageId_postId") or just the suffix.
+  const isMonitored = monitored.some((m) => postId === m || postId.endsWith("_" + m) || m.endsWith("_" + postId.split("_").pop()));
+  if (!isMonitored) {
+    await supabaseAdmin.from("analytics_events").insert({
+      event_type: "fb_comment_skipped",
+      meta: { post_id: postId, reason: "not_monitored" },
+    });
+    return;
+  }
+
+  const { data: settings } = await supabaseAdmin
+    .from("ai_settings")
+    .select("*")
+    .limit(1)
+    .maybeSingle();
+
+  // Record the comment
+  await supabaseAdmin.from("comments").insert({
+    comment_id: commentId,
+    post_id: postId,
+    commenter_id: fromId ?? null,
+    commenter_name: fromName ?? null,
+    text,
+    action: "received",
+  });
+
+  if (settings && settings.auto_reply_comments === false) return;
+
+  // Generate reply
+  const { data: kb } = await supabaseAdmin
+    .from("knowledge_entries")
+    .select("question,answer,category")
+    .limit(200);
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey) return;
+
+  const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
+  const { generateText } = await import("ai");
+  const gateway = createLovableAiGatewayProvider(apiKey);
+  const model = gateway(settings?.model ?? "google/gemini-3-flash-preview");
+  const kbText = (kb ?? []).map((k: any) => `Q: ${k.question}\nA: ${k.answer}`).join("\n---\n");
+  const system = `${settings?.system_instructions ?? ""}\n\nYou are replying to a public Facebook comment. Keep replies short (1-2 sentences), warm, in the same language the commenter used. If they ask price/details/order, invite them to inbox.\n\nKnowledge Base:\n${kbText || "(empty)"}`;
+
+  let replyText = "";
+  try {
+    const result = await generateText({
+      model,
+      system,
+      prompt: `Comment: ${text || "(no text)"}\nReply:`,
+    });
+    replyText = result.text?.trim() ?? "";
+  } catch (err) {
+    console.error("comment AI failed", err);
+    return;
+  }
+  if (!replyText) return;
+
+  // Reply to the comment
+  const replyRes = await fetch(
+    `https://graph.facebook.com/v21.0/${commentId}/comments?access_token=${encodeURIComponent(cfg.page_access_token)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: replyText }),
+    },
+  );
+  if (!replyRes.ok) {
+    const errText = await replyRes.text();
+    await supabaseAdmin.from("analytics_events").insert({
+      event_type: "fb_comment_reply_failed",
+      meta: { status: replyRes.status, body: errText, post_id: postId },
+    });
+    return;
+  }
+
+  await supabaseAdmin
+    .from("comments")
+    .update({ action: "replied" })
+    .eq("comment_id", commentId);
+
+  await supabaseAdmin.from("analytics_events").insert({
+    event_type: "fb_comment_replied",
+    meta: { post_id: postId, comment_id: commentId },
+  });
 }
