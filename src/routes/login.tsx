@@ -7,6 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+const APP_URL = "https://id-preview--5c37c6b8-2d4f-4901-bfe7-810baaba3f65.lovable.app";
+const getAuthRedirectUrl = () => {
+  if (typeof window === "undefined") return `${APP_URL}/dashboard`;
+
+  const origin = window.location.origin;
+  if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
+    return `${APP_URL}/dashboard`;
+  }
+
+  return `${origin}/dashboard`;
+};
+
 export const Route = createFileRoute("/login")({ component: LoginPage });
 
 function LoginPage() {
@@ -35,7 +47,7 @@ function LoginPage() {
       if (mode === "signup") {
         const { data, error } = await metapilotSupabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: window.location.origin + "/dashboard" },
+          options: { emailRedirectTo: getAuthRedirectUrl() },
         });
         if (error) throw error;
         if (data.session?.user) {
@@ -69,7 +81,7 @@ function LoginPage() {
     try {
       const { error } = await metapilotSupabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin + "/dashboard" },
+        options: { redirectTo: getAuthRedirectUrl() },
       });
       if (error) throw error;
     } catch (err: any) {
