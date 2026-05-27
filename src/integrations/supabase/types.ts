@@ -160,6 +160,7 @@ export type Database = {
           app_secret: string | null
           connected: boolean
           id: string
+          monitored_post_ids: string[]
           page_access_token: string | null
           page_id: string | null
           page_name: string | null
@@ -170,6 +171,7 @@ export type Database = {
           app_secret?: string | null
           connected?: boolean
           id?: string
+          monitored_post_ids?: string[]
           page_access_token?: string | null
           page_id?: string | null
           page_name?: string | null
@@ -180,6 +182,7 @@ export type Database = {
           app_secret?: string | null
           connected?: boolean
           id?: string
+          monitored_post_ids?: string[]
           page_access_token?: string | null
           page_id?: string | null
           page_name?: string | null
@@ -329,6 +332,10 @@ export type Database = {
           connected: boolean
           id: string
           last_synced_at: string | null
+          orders_last_synced_at: string | null
+          orders_sheet_id: string | null
+          orders_sheet_tab: string | null
+          orders_sheet_url: string | null
           row_count: number | null
           sheet_id: string | null
           sheet_name: string | null
@@ -339,6 +346,10 @@ export type Database = {
           connected?: boolean
           id?: string
           last_synced_at?: string | null
+          orders_last_synced_at?: string | null
+          orders_sheet_id?: string | null
+          orders_sheet_tab?: string | null
+          orders_sheet_url?: string | null
           row_count?: number | null
           sheet_id?: string | null
           sheet_name?: string | null
@@ -349,6 +360,10 @@ export type Database = {
           connected?: boolean
           id?: string
           last_synced_at?: string | null
+          orders_last_synced_at?: string | null
+          orders_sheet_id?: string | null
+          orders_sheet_tab?: string | null
+          orders_sheet_url?: string | null
           row_count?: number | null
           sheet_id?: string | null
           sheet_name?: string | null
