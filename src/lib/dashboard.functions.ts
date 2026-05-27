@@ -3,14 +3,17 @@ import { requireMetapilotAuth } from "@/lib/metapilot-auth-middleware";
 import { z } from "zod";
 
 type DbError = { message: string } | null;
-type RoleQuery = {
-  eq: (column: string, value: string) => RoleQuery;
-  maybeSingle: () => Promise<{ data: unknown; error: DbError }>;
+type RoleSelector = {
+  select: (columns: string) => {
+    eq: (column: string, value: string) => {
+      eq: (column: string, value: string) => {
+        maybeSingle: () => PromiseLike<{ data: unknown; error: DbError }>;
+      };
+    };
+  };
 };
 type RoleClient = {
-  from: (table: string) => {
-    select: (columns: string) => RoleQuery;
-  };
+  from: (table: string) => unknown;
 };
 type KnowledgeEntry = { question: string | null; answer: string | null };
 
@@ -19,14 +22,20 @@ function errorMessage(error: unknown) {
 }
 
 async function assertAdmin(supabase: RoleClient, userId: string) {
-  const { data, error } = await supabase
-    .from("user_roles")
+  const userRoles = supabase.from("user_roles") as RoleSelector;
+  const { data, error } = await userRoles
     .select("role")
     .eq("user_id", userId)
     .eq("role", "admin")
     .maybeSingle();
   if (error || !data) throw new Error("Forbidden: admin role required");
 }
+
+type SupabaseTableReader = {
+  from: (table: string) => {
+    select: (columns: string) => unknown;
+  };
+};
 
 export const getDashboardOverview = createServerFn({ method: "GET" })
   .middleware([requireMetapilotAuth])
