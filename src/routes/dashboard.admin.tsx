@@ -39,6 +39,18 @@ type SettingsForm = {
   paywall_message: string;
 };
 
+type ProfileRow = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  is_approved: boolean;
+  approved_until: string | null;
+};
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 const DEFAULT_SETTINGS: SettingsForm = {
   price_bdt: 2000,
   duration_days: 30,
@@ -82,7 +94,7 @@ function AdminControlsPage() {
       toast.success("User approval updated");
       qc.invalidateQueries({ queryKey: ["admin-controls"] });
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => toast.error(errorMessage(e)),
   });
 
   const saveSettings = useMutation({
@@ -91,7 +103,7 @@ function AdminControlsPage() {
       toast.success("Package settings saved");
       qc.invalidateQueries({ queryKey: ["admin-controls"] });
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => toast.error(errorMessage(e)),
   });
 
   const approvedUntil = useMemo(() => {
@@ -153,7 +165,7 @@ function AdminControlsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(data?.profiles ?? []).map((p: any) => {
+                {((data?.profiles ?? []) as ProfileRow[]).map((p) => {
                   const expired = p.approved_until
                     ? new Date(p.approved_until).getTime() <= Date.now()
                     : false;
