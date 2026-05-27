@@ -6,6 +6,7 @@ import {
   useLocation,
   redirect,
 } from "@tanstack/react-router";
+import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
 import {
@@ -65,7 +66,7 @@ const nav = [
 function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
