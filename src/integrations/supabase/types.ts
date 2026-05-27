@@ -77,6 +77,36 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          id: string
+          package_name: string
+          paywall_message: string
+          paywall_title: string
+          price_bdt: number
+          updated_at: string
+          whatsapp_number: string | null
+        }
+        Insert: {
+          id?: string
+          package_name?: string
+          paywall_message?: string
+          paywall_title?: string
+          price_bdt?: number
+          updated_at?: string
+          whatsapp_number?: string | null
+        }
+        Update: {
+          id?: string
+          package_name?: string
+          paywall_message?: string
+          paywall_title?: string
+          price_bdt?: number
+          updated_at?: string
+          whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           action: string
@@ -310,6 +340,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_approved: boolean
         }
         Insert: {
           avatar_url?: string | null
@@ -317,6 +348,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          is_approved?: boolean
         }
         Update: {
           avatar_url?: string | null
@@ -324,6 +356,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_approved?: boolean
         }
         Relationships: []
       }
