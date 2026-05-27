@@ -1,12 +1,13 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
-import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles } from "lucide-react";
+import { LayoutDashboard, MessageSquare, MessageCircle, ShoppingBag, Brain, Sheet, BarChart3, Settings, LogOut, Sparkles, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet as SheetUI, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
 import { FullPageLoader } from "@/components/page-loader";
+import { Paywall } from "@/components/paywall";
 
 export const Route = createFileRoute("/dashboard")({
   // Auth lives in localStorage — render entirely on the client to avoid
@@ -36,6 +37,7 @@ const nav = [
   { to: "/dashboard/ai", label: "AI Settings", icon: Brain },
   { to: "/dashboard/sheets", label: "Google Sheets", icon: Sheet },
   { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/dashboard/users", label: "Users & Pricing", icon: Users },
   { to: "/dashboard/connect", label: "Facebook & API", icon: Settings },
 ];
 
@@ -44,18 +46,28 @@ function DashboardLayout() {
   const location = useLocation();
   const [user, setUser] = useState<any>(null);
   const [checking, setChecking] = useState(true);
+  const [isApproved, setIsApproved] = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    metapilotSupabase.auth.getSession().then(({ data }) => {
+    metapilotSupabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
       if (!data.session?.user) {
         navigate({ to: "/login", replace: true });
-      } else {
-        setUser(data.session.user);
-        setChecking(false);
+        return;
       }
+      const u = data.session.user;
+      setUser(u);
+      const [{ data: profile }, { data: roleRow }] = await Promise.all([
+        metapilotSupabase.from("profiles").select("is_approved").eq("id", u.id).maybeSingle(),
+        metapilotSupabase.from("user_roles").select("role").eq("user_id", u.id).eq("role", "admin").maybeSingle(),
+      ]);
+      if (!mounted) return;
+      setIsAdmin(!!roleRow);
+      setIsApproved(!!profile?.is_approved || !!roleRow);
+      setChecking(false);
     });
     const { data: { subscription } } = metapilotSupabase.auth.onAuthStateChange((event, s) => {
       // Only react to explicit sign-out. INITIAL_SESSION / TOKEN_REFRESHED
@@ -76,6 +88,10 @@ function DashboardLayout() {
 
   if (checking) {
     return <FullPageLoader label="Preparing your dashboard" />;
+  }
+
+  if (isApproved === false) {
+    return <Paywall userEmail={user?.email} onSignOut={signOut} />;
   }
 
   const SidebarContent = () => (
