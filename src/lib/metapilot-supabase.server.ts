@@ -28,4 +28,14 @@ export function createMetapilotAdminClient() {
   });
 }
 
-export const metapilotSupabaseAdmin = createMetapilotAdminClient();
+let metapilotAdminClient: ReturnType<typeof createMetapilotAdminClient> | undefined;
+
+export const metapilotSupabaseAdmin = new Proxy({} as ReturnType<typeof createMetapilotAdminClient>, {
+  get(_target, prop, receiver) {
+    if (!metapilotAdminClient) {
+      metapilotAdminClient = createMetapilotAdminClient();
+    }
+
+    return Reflect.get(metapilotAdminClient, prop, receiver);
+  },
+});
