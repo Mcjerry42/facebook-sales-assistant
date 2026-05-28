@@ -245,6 +245,21 @@ export const saveFbConfig = createServerFn({ method: "POST" })
       const { error } = await supabase.from("fb_config").insert(payload);
       if (error) throw new Error(error.message);
     }
+
+    if (payload.connected && data.page_id && data.page_access_token) {
+      try {
+        const subRes = await fetch(
+          `https://graph.facebook.com/v21.0/${data.page_id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,feed&access_token=${encodeURIComponent(data.page_access_token)}`,
+          { method: "POST" }
+        );
+        if (!subRes.ok) {
+          console.error("Failed to subscribe app to page", await subRes.text());
+        }
+      } catch (err) {
+        console.error("Failed to subscribe app", err);
+      }
+    }
+
     return { ok: true };
   });
 

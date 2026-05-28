@@ -70,7 +70,8 @@ async function handleMessagingEvent(ev: any, pageId: string) {
 
   const { data: cfg } = await metapilotSupabaseAdmin
     .from("fb_config")
-    .select("page_access_token, page_id")
+    .select("page_access_token, page_id, user_id")
+    .eq("page_id", pageId)
     .limit(1)
     .maybeSingle();
   if (!cfg?.page_access_token) {
@@ -81,6 +82,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   const { data: settings } = await metapilotSupabaseAdmin
     .from("ai_settings")
     .select("*")
+    .eq("user_id", cfg.user_id)
     .limit(1)
     .maybeSingle();
 
@@ -88,6 +90,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   let { data: conv } = await metapilotSupabaseAdmin
     .from("conversations")
     .select("*")
+    .eq("user_id", cfg.user_id)
     .eq("user_id", cfg.user_id)
     .eq("fb_user_id", senderId)
     .maybeSingle();
@@ -132,6 +135,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
 
   // Save inbound message
   await metapilotSupabaseAdmin.from("messages").insert({
+    user_id: cfg.user_id,
     conversation_id: conv.id,
     sender: "user",
     text,
@@ -146,6 +150,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   const { data: kb } = await metapilotSupabaseAdmin
     .from("knowledge_entries")
     .select("question,answer,category")
+    .eq("user_id", cfg.user_id)
     .limit(200);
 
   const { data: history } = await metapilotSupabaseAdmin
@@ -212,6 +217,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   }
 
   await metapilotSupabaseAdmin.from("messages").insert({
+    user_id: cfg.user_id,
     conversation_id: conv.id,
     sender: "ai",
     text: replyText,
@@ -254,7 +260,8 @@ async function handleFeedChange(change: any, pageId: string) {
 
   const { data: cfg } = await metapilotSupabaseAdmin
     .from("fb_config")
-    .select("page_access_token, monitored_post_ids")
+    .select("page_access_token, monitored_post_ids, user_id")
+    .eq("page_id", pageId)
     .limit(1)
     .maybeSingle();
   if (!cfg?.page_access_token) return;
@@ -274,11 +281,13 @@ async function handleFeedChange(change: any, pageId: string) {
   const { data: settings } = await metapilotSupabaseAdmin
     .from("ai_settings")
     .select("*")
+    .eq("user_id", cfg.user_id)
     .limit(1)
     .maybeSingle();
 
   // Record the comment
   await metapilotSupabaseAdmin.from("comments").insert({
+    user_id: cfg.user_id,
     comment_id: commentId,
     post_id: postId,
     commenter_id: fromId ?? null,
@@ -295,6 +304,7 @@ async function handleFeedChange(change: any, pageId: string) {
   const { data: kb } = await metapilotSupabaseAdmin
     .from("knowledge_entries")
     .select("question,answer,category")
+    .eq("user_id", cfg.user_id)
     .limit(200);
 
   const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
@@ -355,14 +365,14 @@ ${kbText || "(empty)"}`;
           .eq("comment_id", commentId);
         await metapilotSupabaseAdmin.from("analytics_events").insert({
           user_id: cfg.user_id,
-          event_type: "fb_comment_hidden",
+      event_type: "fb_comment_hidden",
           meta: { post_id: postId, comment_id: commentId },
         });
       } else {
         const errText = await hideRes.text();
         await metapilotSupabaseAdmin.from("analytics_events").insert({
           user_id: cfg.user_id,
-          event_type: "fb_comment_hide_failed",
+      event_type: "fb_comment_hide_failed",
           meta: { status: hideRes.status, body: errText, comment_id: commentId },
         });
       }
@@ -384,7 +394,7 @@ ${kbText || "(empty)"}`;
       const errText = await replyRes.text();
       await metapilotSupabaseAdmin.from("analytics_events").insert({
         user_id: cfg.user_id,
-        event_type: "fb_comment_reply_failed",
+      event_type: "fb_comment_reply_failed",
         meta: { status: replyRes.status, body: errText, post_id: postId },
       });
     } else {
@@ -394,7 +404,7 @@ ${kbText || "(empty)"}`;
         .eq("comment_id", commentId);
       await metapilotSupabaseAdmin.from("analytics_events").insert({
         user_id: cfg.user_id,
-        event_type: "fb_comment_replied",
+      event_type: "fb_comment_replied",
         meta: { post_id: postId, comment_id: commentId },
       });
     }
@@ -418,7 +428,7 @@ ${kbText || "(empty)"}`;
       const errText = await pmRes.text();
       await metapilotSupabaseAdmin.from("analytics_events").insert({
         user_id: cfg.user_id,
-        event_type: "fb_comment_dm_failed",
+      event_type: "fb_comment_dm_failed",
         meta: { status: pmRes.status, body: errText, comment_id: commentId },
       });
     } else {
@@ -428,7 +438,7 @@ ${kbText || "(empty)"}`;
         .eq("comment_id", commentId);
       await metapilotSupabaseAdmin.from("analytics_events").insert({
         user_id: cfg.user_id,
-        event_type: "fb_comment_dm_sent",
+      event_type: "fb_comment_dm_sent",
         meta: { comment_id: commentId },
       });
     }
