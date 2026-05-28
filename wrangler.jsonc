@@ -6,6 +6,8 @@
   "main": "src/server.ts",
   "vars": {
     "SUPABASE_URL": "https://pydqjtlingbijppznvzl.supabase.co",
-    "SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5ZHFqdGxpbmdiaWpwcHpudnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4ODgwNzEsImV4cCI6MjA5NTQ2NDA3MX0.2KvtvJFxHM_OFKFO89AujX4tHB33qR0_v2xHHgSf8fg"
+    "SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5ZHFqdGxpbmdiaWpwcHpudnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4ODgwNzEsImV4cCI6MjA5NTQ2NDA3MX0.2KvtvJFxHM_OFKFO89AujX4tHB33qR0_v2xHHgSf8fg",
+    "METAPILOT_SUPABASE_URL": "https://pydqjtlingbijppznvzl.supabase.co",
+    "METAPILOT_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5ZHFqdGxpbmdiaWpwcHpudnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4ODgwNzEsImV4cCI6MjA5NTQ2NDA3MX0.2KvtvJFxHM_OFKFO89AujX4tHB33qR0_v2xHHgSf8fg"
   }
 }

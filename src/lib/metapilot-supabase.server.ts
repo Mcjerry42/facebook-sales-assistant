@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
 function getMetapilotServerConfig() {
-  const url = process.env.METAPILOT_SUPABASE_URL;
+  const url = process.env.METAPILOT_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.METAPILOT_SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey) {

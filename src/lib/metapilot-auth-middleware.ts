@@ -4,8 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
 export const requireMetapilotAuth = createMiddleware({ type: "function" }).server(async ({ next }) => {
-  const url = process.env.METAPILOT_SUPABASE_URL;
-  const publishableKey = process.env.METAPILOT_SUPABASE_ANON_KEY;
+  const url = process.env.METAPILOT_SUPABASE_URL || process.env.SUPABASE_URL;
+  const publishableKey = process.env.METAPILOT_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !publishableKey) {
     throw new Error(
