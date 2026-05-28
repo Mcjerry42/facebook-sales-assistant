@@ -43,14 +43,14 @@ export async function tryExtractAndSaveOrder(args: {
   const model = gateway(args.model);
 
   const system = `You extract orders from chat transcripts (Bengali / English / Banglish).
-Return STRICT JSON only, no markdown, matching this TypeScript type:
-{ "is_order": boolean, "customer_name": string|null, "phone": string|null, "address": string|null, "items": Array<{ "name": string, "quantity": number, "price": number|null }>, "total": number|null, "notes": string|null }
+  Return STRICT JSON only, no markdown, matching this TypeScript type:
+  { "is_order": boolean, "customer_name": string|null, "phone": string|null, "address": string|null, "items": Array<{ "name": string, "quantity": number, "price": number|null }>, "total": number|null, "notes": string|null }
 
-Rules:
-- "is_order" = true ONLY if the customer has CONFIRMED an order AND we have at least: name, phone, address, and at least one item.
-- Phone must look like a real number (digits only or with +, min 10 digits). If unsure, set is_order=false.
-- If anything required is missing or ambiguous, set is_order=false and leave fields null.
-- Do NOT invent data. If the customer is only asking questions, is_order=false.`;
+  Rules:
+  - "is_order" = true ONLY if the customer has CONFIRMED an order AND we have at least: name, phone, address, and at least one item.
+  - Phone must look like a valid phone number (can contain digits, spaces, hyphens, parentheses, or +; must have at least 8 digits). If unsure, set is_order=false.
+  - If anything required is missing or ambiguous, set is_order=false and leave fields null.
+  - Do NOT invent data. If the customer is only asking questions, is_order=false.`;
 
   let parsed: any = null;
   try {
@@ -64,7 +64,32 @@ Rules:
     parsed = JSON.parse(jsonStr);
   } catch (err) {
     console.error("order extraction failed", err);
+    try {
+      await metapilotSupabaseAdmin.from("analytics_events").insert({
+        event_type: "order_extraction_failed",
+        meta: {
+          conversation_id: args.conversationId,
+          error: String(err),
+        }
+      });
+    } catch (e) {
+      console.error("failed to log extraction error", e);
+    }
     return { saved: false, reason: "parse_error" };
+  }
+
+  // Log the extraction attempt with parsed results
+  try {
+    await metapilotSupabaseAdmin.from("analytics_events").insert({
+      event_type: "order_extraction_attempt",
+      meta: {
+        conversation_id: args.conversationId,
+        is_order: parsed?.is_order,
+        extracted: parsed,
+      }
+    });
+  } catch (e) {
+    console.error("failed to log extraction attempt", e);
   }
 
   if (!parsed?.is_order) return { saved: false, reason: "not_order" };
