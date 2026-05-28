@@ -54,17 +54,17 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
     const [convs, orders, comments, msgs, settings, fb, sheets] = await Promise.all([
-      metapilotSupabaseAdmin
+      supabase
         .from("conversations")
         .select("id,fb_user_name,last_message,last_message_at,unread_count,human_takeover")
         .order("last_message_at", { ascending: false })
         .limit(50),
-      metapilotSupabaseAdmin.from("orders").select("*").order("created_at", { ascending: false }).limit(50),
-      metapilotSupabaseAdmin.from("comments").select("*").order("created_at", { ascending: false }).limit(50),
-      metapilotSupabaseAdmin.from("messages").select("id", { count: "exact", head: true }),
-      metapilotSupabaseAdmin.from("ai_settings").select("*").limit(1).maybeSingle(),
-      metapilotSupabaseAdmin.from("fb_config").select("*").limit(1).maybeSingle(),
-      metapilotSupabaseAdmin.from("sheets_config").select("*").limit(1).maybeSingle(),
+      supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(50),
+      supabase.from("comments").select("*").order("created_at", { ascending: false }).limit(50),
+      supabase.from("messages").select("id", { count: "exact", head: true }),
+      supabase.from("ai_settings").select("*").limit(1).maybeSingle(),
+      supabase.from("fb_config").select("*").limit(1).maybeSingle(),
+      supabase.from("sheets_config").select("*").limit(1).maybeSingle(),
     ]);
     return {
       conversations: convs.data ?? [],
@@ -83,7 +83,7 @@ export const getMessages = createServerFn({ method: "GET" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
-    const { data: msgs } = await metapilotSupabaseAdmin
+    const { data: msgs } = await supabase
       .from("messages")
       .select("*")
       .eq("conversation_id", data.conversationId)
@@ -199,19 +199,19 @@ export const saveAiSettings = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
-    const { data: existing } = await metapilotSupabaseAdmin
+    const { data: existing } = await supabase
       .from("ai_settings")
       .select("id")
       .limit(1)
       .maybeSingle();
     if (existing) {
-      const { error } = await metapilotSupabaseAdmin
+      const { error } = await supabase
         .from("ai_settings")
         .update({ ...data, updated_at: new Date().toISOString() })
         .eq("id", existing.id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await metapilotSupabaseAdmin.from("ai_settings").insert(data);
+      const { error } = await supabase.from("ai_settings").insert(data);
       if (error) throw new Error(error.message);
     }
     return { ok: true };
