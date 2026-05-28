@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/public/fb-webhook")({
         const mode = url.searchParams.get("hub.mode");
         const token = url.searchParams.get("hub.verify_token");
         const challenge = url.searchParams.get("hub.challenge");
-        const { data } = await metapilotSupabaseAdmin.from("fb_config").select("verify_token").limit(1).maybeSingle();
+        const { data } = await metapilotSupabaseAdmin.from("fb_config").select("verify_token").not("verify_token", "is", null).limit(1).maybeSingle();
         const expected = data?.verify_token ?? "lovable_fb_verify_token";
         if (mode === "subscribe" && token === expected) {
           return new Response(challenge ?? "", { status: 200 });
@@ -88,6 +88,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   let { data: conv } = await metapilotSupabaseAdmin
     .from("conversations")
     .select("*")
+    .eq("user_id", cfg.user_id)
     .eq("fb_user_id", senderId)
     .maybeSingle();
 
@@ -107,6 +108,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
     const { data: created } = await metapilotSupabaseAdmin
       .from("conversations")
       .insert({
+        user_id: cfg.user_id,
         fb_user_id: senderId,
         fb_user_name: fbUserName,
         fb_user_avatar: fbUserAvatar,
@@ -262,6 +264,7 @@ async function handleFeedChange(change: any, pageId: string) {
   const isMonitored = monitored.some((m) => postId === m || postId.endsWith("_" + m) || m.endsWith("_" + postId.split("_").pop()));
   if (!isMonitored) {
     await metapilotSupabaseAdmin.from("analytics_events").insert({
+      user_id: cfg.user_id,
       event_type: "fb_comment_skipped",
       meta: { post_id: postId, reason: "not_monitored" },
     });
@@ -351,12 +354,14 @@ ${kbText || "(empty)"}`;
           .update({ action: "hidden", hidden: true })
           .eq("comment_id", commentId);
         await metapilotSupabaseAdmin.from("analytics_events").insert({
+          user_id: cfg.user_id,
           event_type: "fb_comment_hidden",
           meta: { post_id: postId, comment_id: commentId },
         });
       } else {
         const errText = await hideRes.text();
         await metapilotSupabaseAdmin.from("analytics_events").insert({
+          user_id: cfg.user_id,
           event_type: "fb_comment_hide_failed",
           meta: { status: hideRes.status, body: errText, comment_id: commentId },
         });
@@ -378,6 +383,7 @@ ${kbText || "(empty)"}`;
     if (!replyRes.ok) {
       const errText = await replyRes.text();
       await metapilotSupabaseAdmin.from("analytics_events").insert({
+        user_id: cfg.user_id,
         event_type: "fb_comment_reply_failed",
         meta: { status: replyRes.status, body: errText, post_id: postId },
       });
@@ -387,6 +393,7 @@ ${kbText || "(empty)"}`;
         .update({ action: "replied" })
         .eq("comment_id", commentId);
       await metapilotSupabaseAdmin.from("analytics_events").insert({
+        user_id: cfg.user_id,
         event_type: "fb_comment_replied",
         meta: { post_id: postId, comment_id: commentId },
       });
@@ -410,6 +417,7 @@ ${kbText || "(empty)"}`;
     if (!pmRes.ok) {
       const errText = await pmRes.text();
       await metapilotSupabaseAdmin.from("analytics_events").insert({
+        user_id: cfg.user_id,
         event_type: "fb_comment_dm_failed",
         meta: { status: pmRes.status, body: errText, comment_id: commentId },
       });
@@ -419,6 +427,7 @@ ${kbText || "(empty)"}`;
         .update({ dm_sent: true })
         .eq("comment_id", commentId);
       await metapilotSupabaseAdmin.from("analytics_events").insert({
+        user_id: cfg.user_id,
         event_type: "fb_comment_dm_sent",
         meta: { comment_id: commentId },
       });

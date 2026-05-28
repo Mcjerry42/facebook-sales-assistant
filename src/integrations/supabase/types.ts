@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       ai_settings: {
         Row: {
+          user_id: string | null;
           api_key: string | null
           auto_hide_abusive: boolean
           auto_reply_comments: boolean
@@ -29,6 +30,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          user_id?: string | null;
           api_key?: string | null
           auto_hide_abusive?: boolean
           auto_reply_comments?: boolean
@@ -42,6 +44,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          user_id?: string | null;
           api_key?: string | null
           auto_hide_abusive?: boolean
           auto_reply_comments?: boolean
@@ -58,18 +61,21 @@ export type Database = {
       }
       analytics_events: {
         Row: {
+          user_id: string | null;
           created_at: string
           event_type: string
           id: string
           meta: Json | null
         }
         Insert: {
+          user_id?: string | null;
           created_at?: string
           event_type: string
           id?: string
           meta?: Json | null
         }
         Update: {
+          user_id?: string | null;
           created_at?: string
           event_type?: string
           id?: string
@@ -112,6 +118,7 @@ export type Database = {
       }
       comments: {
         Row: {
+          user_id: string | null;
           action: string
           comment_id: string | null
           commenter_id: string | null
@@ -124,6 +131,7 @@ export type Database = {
           text: string
         }
         Insert: {
+          user_id?: string | null;
           action?: string
           comment_id?: string | null
           commenter_id?: string | null
@@ -136,6 +144,7 @@ export type Database = {
           text: string
         }
         Update: {
+          user_id?: string | null;
           action?: string
           comment_id?: string | null
           commenter_id?: string | null
@@ -151,6 +160,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          user_id: string | null;
           created_at: string
           fb_user_avatar: string | null
           fb_user_id: string | null
@@ -163,6 +173,7 @@ export type Database = {
           unread_count: number
         }
         Insert: {
+          user_id?: string | null;
           created_at?: string
           fb_user_avatar?: string | null
           fb_user_id?: string | null
@@ -175,6 +186,7 @@ export type Database = {
           unread_count?: number
         }
         Update: {
+          user_id?: string | null;
           created_at?: string
           fb_user_avatar?: string | null
           fb_user_id?: string | null
@@ -190,6 +202,7 @@ export type Database = {
       }
       fb_config: {
         Row: {
+          user_id: string | null;
           app_secret: string | null
           connected: boolean
           id: string
@@ -201,6 +214,7 @@ export type Database = {
           verify_token: string | null
         }
         Insert: {
+          user_id?: string | null;
           app_secret?: string | null
           connected?: boolean
           id?: string
@@ -212,6 +226,7 @@ export type Database = {
           verify_token?: string | null
         }
         Update: {
+          user_id?: string | null;
           app_secret?: string | null
           connected?: boolean
           id?: string
@@ -226,6 +241,7 @@ export type Database = {
       }
       knowledge_entries: {
         Row: {
+          user_id: string | null;
           answer: string | null
           category: string | null
           created_at: string
@@ -234,6 +250,7 @@ export type Database = {
           raw_row: Json | null
         }
         Insert: {
+          user_id?: string | null;
           answer?: string | null
           category?: string | null
           created_at?: string
@@ -242,6 +259,7 @@ export type Database = {
           raw_row?: Json | null
         }
         Update: {
+          user_id?: string | null;
           answer?: string | null
           category?: string | null
           created_at?: string
@@ -253,6 +271,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          user_id: string | null;
           conversation_id: string
           created_at: string
           id: string
@@ -261,6 +280,7 @@ export type Database = {
           text: string
         }
         Insert: {
+          user_id?: string | null;
           conversation_id: string
           created_at?: string
           id?: string
@@ -269,6 +289,7 @@ export type Database = {
           text: string
         }
         Update: {
+          user_id?: string | null;
           conversation_id?: string
           created_at?: string
           id?: string
@@ -288,6 +309,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          user_id: string | null;
           address: string | null
           conversation_id: string | null
           created_at: string
@@ -301,6 +323,7 @@ export type Database = {
           total: number | null
         }
         Insert: {
+          user_id?: string | null;
           address?: string | null
           conversation_id?: string | null
           created_at?: string
@@ -314,6 +337,7 @@ export type Database = {
           total?: number | null
         }
         Update: {
+          user_id?: string | null;
           address?: string | null
           conversation_id?: string | null
           created_at?: string
@@ -368,6 +392,7 @@ export type Database = {
       }
       sheets_config: {
         Row: {
+          user_id: string | null;
           connected: boolean
           id: string
           last_synced_at: string | null
@@ -382,6 +407,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          user_id?: string | null;
           connected?: boolean
           id?: string
           last_synced_at?: string | null
@@ -396,6 +422,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          user_id?: string | null;
           connected?: boolean
           id?: string
           last_synced_at?: string | null
