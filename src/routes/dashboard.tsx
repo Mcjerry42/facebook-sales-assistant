@@ -145,7 +145,9 @@ function DashboardLayout() {
         <span className="font-semibold tracking-tight">MetaPilot</span>
       </Link>
       <nav className="flex-1 space-y-1">
-        {nav.map((item) => {
+        {nav
+          .filter((item) => item.to !== "/dashboard/admin" || user?.email === "nanjerry42@gmail.com")
+          .map((item) => {
           const active = item.exact
             ? location.pathname === item.to
             : location.pathname.startsWith(item.to);

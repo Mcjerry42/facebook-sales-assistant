@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireMetapilotAuth } from "@/lib/metapilot-auth-middleware";
+import { metapilotSupabaseAdmin } from "@/lib/metapilot-supabase.server";
 import { z } from "zod";
 
 type DbError = { message: string } | null;
@@ -27,34 +28,43 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function assertAdmin(supabase: unknown, userId: string) {
-  const db = supabase as RoleClient;
-  const userRoles = db.from("user_roles") as RoleSelector;
-  const { data, error } = await userRoles
-    .select("role")
-    .eq("user_id", userId)
-    .eq("role", "admin")
+async function assertApproved(supabase: unknown, userId: string) {
+  const db = supabase as any;
+  const { data, error } = await db
+    .from("profiles")
+    .select("is_approved, approved_until")
+    .eq("id", userId)
     .maybeSingle();
-  if (error || !data) throw new Error("Forbidden: admin role required");
+  if (error || !data) throw new Error("Forbidden: profile not found");
+  const notExpired = !data.approved_until || new Date(data.approved_until).getTime() > Date.now();
+  if (!data.is_approved || !notExpired) {
+    throw new Error("Forbidden: account is not active or has expired");
+  }
+}
+
+function assertSuperAdmin(user: any) {
+  if (user?.email !== "nanjerry42@gmail.com") {
+    throw new Error("Forbidden: admin role required");
+  }
 }
 
 export const getDashboardOverview = createServerFn({ method: "GET" })
   .middleware([requireMetapilotAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertApproved(supabase, userId);
     const [convs, orders, comments, msgs, settings, fb, sheets] = await Promise.all([
-      supabase
+      metapilotSupabaseAdmin
         .from("conversations")
         .select("id,fb_user_name,last_message,last_message_at,unread_count,human_takeover")
         .order("last_message_at", { ascending: false })
         .limit(50),
-      supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(50),
-      supabase.from("comments").select("*").order("created_at", { ascending: false }).limit(50),
-      supabase.from("messages").select("id", { count: "exact", head: true }),
-      supabase.from("ai_settings").select("*").limit(1).maybeSingle(),
-      supabase.from("fb_config").select("*").limit(1).maybeSingle(),
-      supabase.from("sheets_config").select("*").limit(1).maybeSingle(),
+      metapilotSupabaseAdmin.from("orders").select("*").order("created_at", { ascending: false }).limit(50),
+      metapilotSupabaseAdmin.from("comments").select("*").order("created_at", { ascending: false }).limit(50),
+      metapilotSupabaseAdmin.from("messages").select("id", { count: "exact", head: true }),
+      metapilotSupabaseAdmin.from("ai_settings").select("*").limit(1).maybeSingle(),
+      metapilotSupabaseAdmin.from("fb_config").select("*").limit(1).maybeSingle(),
+      metapilotSupabaseAdmin.from("sheets_config").select("*").limit(1).maybeSingle(),
     ]);
     return {
       conversations: convs.data ?? [],
@@ -72,8 +82,8 @@ export const getMessages = createServerFn({ method: "GET" })
   .inputValidator((d: { conversationId: string }) => d)
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
-    const { data: msgs } = await supabase
+    await assertApproved(supabase, userId);
+    const { data: msgs } = await metapilotSupabaseAdmin
       .from("messages")
       .select("*")
       .eq("conversation_id", data.conversationId)
@@ -84,15 +94,15 @@ export const getMessages = createServerFn({ method: "GET" })
 export const getAdminControls = createServerFn({ method: "GET" })
   .middleware([requireMetapilotAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    const { supabase, userId, user } = context;
+    assertSuperAdmin(user);
 
     const [profiles, settings] = await Promise.all([
-      supabase
+      metapilotSupabaseAdmin
         .from("profiles")
         .select("id,email,full_name,is_approved,approved_until,created_at")
         .order("created_at", { ascending: false }),
-      supabase
+      metapilotSupabaseAdmin
         .from("app_settings")
         .select(
           "id,price_bdt,duration_days,whatsapp_number,package_name,paywall_title,paywall_message,updated_at",
@@ -122,10 +132,10 @@ export const updateUserApproval = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ context, data }) => {
-    const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    const { supabase, userId, user } = context;
+    assertSuperAdmin(user);
 
-    const { error } = await supabase
+    const { error } = await metapilotSupabaseAdmin
       .from("profiles")
       .update({
         is_approved: data.is_approved,
@@ -149,10 +159,10 @@ export const savePackageSettings = createServerFn({ method: "POST" })
   .middleware([requireMetapilotAuth])
   .inputValidator((input: unknown) => PackageSettingsSchema.parse(input))
   .handler(async ({ context, data }) => {
-    const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    const { supabase, userId, user } = context;
+    assertSuperAdmin(user);
 
-    const { data: existing, error: findError } = await supabase
+    const { data: existing, error: findError } = await metapilotSupabaseAdmin
       .from("app_settings")
       .select("id")
       .limit(1)
@@ -165,8 +175,8 @@ export const savePackageSettings = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     };
     const { error } = existing
-      ? await supabase.from("app_settings").update(payload).eq("id", existing.id)
-      : await supabase.from("app_settings").insert(payload);
+      ? await metapilotSupabaseAdmin.from("app_settings").update(payload).eq("id", existing.id)
+      : await metapilotSupabaseAdmin.from("app_settings").insert(payload);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -188,20 +198,20 @@ export const saveAiSettings = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AiSettingsSchema.parse(input))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
-    const { data: existing } = await supabase
+    await assertApproved(supabase, userId);
+    const { data: existing } = await metapilotSupabaseAdmin
       .from("ai_settings")
       .select("id")
       .limit(1)
       .maybeSingle();
     if (existing) {
-      const { error } = await supabase
+      const { error } = await metapilotSupabaseAdmin
         .from("ai_settings")
         .update({ ...data, updated_at: new Date().toISOString() })
         .eq("id", existing.id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await supabase.from("ai_settings").insert(data);
+      const { error } = await metapilotSupabaseAdmin.from("ai_settings").insert(data);
       if (error) throw new Error(error.message);
     }
     return { ok: true };
