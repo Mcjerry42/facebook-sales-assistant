@@ -231,7 +231,7 @@ export const saveFbConfig = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => FbConfigSchema.parse(input))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertApproved(supabase, userId);
     const { data: existing } = await supabase.from("fb_config").select("id").limit(1).maybeSingle();
     const payload = {
       ...data,
@@ -263,7 +263,7 @@ export const connectSheet = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => SheetsSchema.parse(input))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertApproved(supabase, userId);
     const sheetId = extractSheetId(data.sheet_url);
     if (!sheetId) throw new Error("Invalid Google Sheets URL");
 
@@ -363,7 +363,7 @@ export const askAi = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ message: z.string().min(1).max(2000) }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertApproved(supabase, userId);
     const { data: settings } = await supabase
       .from("ai_settings")
       .select("*")
@@ -401,7 +401,7 @@ export const toggleHumanTakeover = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertApproved(supabase, userId);
     const { error } = await supabase
       .from("conversations")
       .update({ human_takeover: data.enabled })
@@ -422,7 +422,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertApproved(supabase, userId);
     const { error } = await supabase
       .from("orders")
       .update({ status: data.status })
@@ -438,7 +438,7 @@ export const saveOrdersSheet = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertApproved(supabase, userId);
     const { data: existing } = await supabase
       .from("sheets_config")
       .select("id")
@@ -466,7 +466,7 @@ export const testOrdersSheet = createServerFn({ method: "POST" })
   .middleware([requireMetapilotAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertApproved(supabase, userId);
     const { data: cfg } = await supabase
       .from("sheets_config")
       .select("orders_sheet_url")
