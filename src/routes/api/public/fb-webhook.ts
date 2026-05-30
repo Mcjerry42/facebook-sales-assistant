@@ -98,6 +98,8 @@ async function handleMessagingEvent(ev: any, pageId: string) {
       .select("*")
       .eq("user_id", cfg.user_id)
       .eq("fb_user_id", senderId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle(),
   ]);
 
@@ -183,13 +185,17 @@ async function handleMessagingEvent(ev: any, pageId: string) {
     .slice()
     .reverse()
     .map((m: any) => ({ role: m.is_ai ? ("assistant" as const) : ("user" as const), content: m.text }));
+  
+  // Since history was fetched in parallel with the insert, it might not contain the current message
+  // Just in case, append the current message.
+  recent.push({ role: "user", content: text });
 
   let replyText = "";
   try {
     const result = await generateText({
       model,
       system,
-      messages: recent.length > 0 ? recent : [{ role: "user", content: text }],
+      messages: recent,
     });
     replyText = result.text?.trim() ?? "";
   } catch (err) {
