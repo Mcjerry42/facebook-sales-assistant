@@ -42,11 +42,6 @@ async function assertApproved(supabase: unknown, userId: string) {
   }
 }
 
-function assertSuperAdmin(user: any) {
-  if (user?.email !== "nanjerry42@gmail.com") {
-    throw new Error("Forbidden: admin role required");
-  }
-}
 
 export const getDashboardOverview = createServerFn({ method: "GET" })
   .middleware([requireMetapilotAuth])
@@ -91,95 +86,9 @@ export const getMessages = createServerFn({ method: "GET" })
     return msgs ?? [];
   });
 
-export const getAdminControls = createServerFn({ method: "GET" })
-  .middleware([requireMetapilotAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId, user } = context;
-    assertSuperAdmin(user);
 
-    const [profiles, settings] = await Promise.all([
-      metapilotSupabaseAdmin
-        .from("profiles")
-        .select("id,email,full_name,is_approved,approved_until,created_at")
-        .order("created_at", { ascending: false }),
-      metapilotSupabaseAdmin
-        .from("app_settings")
-        .select(
-          "id,price_bdt,duration_days,whatsapp_number,package_name,paywall_title,paywall_message,updated_at",
-        )
-        .limit(1)
-        .maybeSingle(),
-    ]);
 
-    if (profiles.error) throw new Error(profiles.error.message);
-    if (settings.error) throw new Error(settings.error.message);
 
-    return {
-      profiles: profiles.data ?? [],
-      settings: settings.data,
-    };
-  });
-
-export const updateUserApproval = createServerFn({ method: "POST" })
-  .middleware([requireMetapilotAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .object({
-        userId: z.string().uuid(),
-        is_approved: z.boolean(),
-        approved_until: z.string().datetime().nullable().optional(),
-      })
-      .parse(input),
-  )
-  .handler(async ({ context, data }) => {
-    const { supabase, userId, user } = context;
-    assertSuperAdmin(user);
-
-    const { error } = await metapilotSupabaseAdmin
-      .from("profiles")
-      .update({
-        is_approved: data.is_approved,
-        approved_until: data.approved_until ?? null,
-      })
-      .eq("id", data.userId);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
-const PackageSettingsSchema = z.object({
-  price_bdt: z.coerce.number().min(0).max(10000000),
-  duration_days: z.coerce.number().int().min(1).max(3650),
-  whatsapp_number: z.string().max(50).nullable().optional(),
-  package_name: z.string().min(1).max(100),
-  paywall_title: z.string().min(1).max(200),
-  paywall_message: z.string().min(1).max(1200),
-});
-
-export const savePackageSettings = createServerFn({ method: "POST" })
-  .middleware([requireMetapilotAuth])
-  .inputValidator((input: unknown) => PackageSettingsSchema.parse(input))
-  .handler(async ({ context, data }) => {
-    const { supabase, userId, user } = context;
-    assertSuperAdmin(user);
-
-    const { data: existing, error: findError } = await metapilotSupabaseAdmin
-      .from("app_settings")
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-    if (findError) throw new Error(findError.message);
-
-    const payload = {
-      ...data,
-      whatsapp_number: data.whatsapp_number || null,
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = existing
-      ? await metapilotSupabaseAdmin.from("app_settings").update(payload).eq("id", existing.id)
-      : await metapilotSupabaseAdmin.from("app_settings").insert(payload);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
 
 const AiSettingsSchema = z.object({
   provider: z.enum(["lovable", "openai", "gemini"]),

@@ -1,11 +1,20 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { createServerFn, useServerFn } from "@tanstack/react-start";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
+import { metapilotSupabaseAdmin } from "@/lib/metapilot-supabase.server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
+
+const checkSignupsAllowed = createServerFn({ method: "GET" }).handler(async () => {
+  const { count } = await metapilotSupabaseAdmin
+    .from("profiles")
+    .select("*", { count: "exact", head: true });
+  return (count ?? 0) === 0;
+});
 
 const APP_URL = "https://id-preview--5c37c6b8-2d4f-4901-bfe7-810baaba3f65.lovable.app";
 const getAuthRedirectUrl = () => {
@@ -19,11 +28,18 @@ const getAuthRedirectUrl = () => {
   return `${origin}/dashboard`;
 };
 
-export const Route = createFileRoute("/login")({ component: LoginPage });
+export const Route = createFileRoute("/login")({
+  component: LoginPage,
+  loader: async () => {
+    const signupsAllowed = await checkSignupsAllowed();
+    return { signupsAllowed };
+  },
+});
 
 function LoginPage() {
+  const { signupsAllowed } = Route.useLoaderData();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(signupsAllowed ? "signup" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,6 +61,9 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
+        if (!signupsAllowed) {
+           throw new Error("Signups are currently disabled because the application already has an owner.");
+        }
         const { data, error } = await metapilotSupabase.auth.signUp({
           email, password,
           options: { emailRedirectTo: getAuthRedirectUrl() },
@@ -101,15 +120,21 @@ function LoginPage() {
           <span className="font-semibold">MetaPilot AI</span>
         </Link>
         <h1 className="text-2xl font-bold">{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">The first account becomes the admin.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+           {signupsAllowed ? "The first account becomes the owner." : "Signups are closed. Please log in."}
+        </p>
 
-        <Button onClick={handleGoogle} variant="outline" className="mt-6 w-full">
-          Continue with Google
-        </Button>
+        {mode === "signin" && (
+          <Button onClick={handleGoogle} variant="outline" className="mt-6 w-full">
+            Continue with Google
+          </Button>
+        )}
 
-        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-          <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
-        </div>
+        {mode === "signin" && (
+          <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -131,9 +156,11 @@ function LoginPage() {
           </div>
         )}
 
-        <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="mt-4 w-full text-sm text-muted-foreground hover:text-foreground">
-          {mode === "signin" ? "No account? Sign up" : "Already have an account? Sign in"}
-        </button>
+        {signupsAllowed && (
+          <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="mt-4 w-full text-sm text-muted-foreground hover:text-foreground">
+            {mode === "signin" ? "No account? Sign up" : "Already have an account? Sign in"}
+          </button>
+        )}
       </div>
     </div>
   );
