@@ -68,6 +68,8 @@ function DashboardLayout() {
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
+  const [isAppOwner, setIsAppOwner] = useState<boolean | null>(null);
+  const [whatsapp, setWhatsapp] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -80,31 +82,37 @@ function DashboardLayout() {
       }
       const u = data.session.user;
       setUser(u);
-      const [{ data: profile }, { data: roleRow }] = await Promise.all([
+      const [{ data: profile }, { data: allProfiles }, { data: settings }] = await Promise.all([
         metapilotSupabase
           .from("profiles")
           .select("is_approved, approved_until")
           .eq("id", u.id)
           .maybeSingle(),
         metapilotSupabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", u.id)
-          .eq("role", "admin")
+          .from("profiles")
+          .select("id")
+          .order("created_at", { ascending: true })
+          .limit(1),
+        metapilotSupabase
+          .from("app_settings")
+          .select("whatsapp_number")
+          .limit(1)
           .maybeSingle(),
       ]);
       if (!mounted) return;
       const notExpired =
         !profile?.approved_until || new Date(profile.approved_until).getTime() > Date.now();
-      const approved = (!!profile?.is_approved && notExpired) || !!roleRow;
+      const approved = !!profile?.is_approved && notExpired;
+      const ownerId = allProfiles?.[0]?.id;
+      
       setIsApproved(approved);
+      setIsAppOwner(ownerId === u.id);
+      setWhatsapp(settings?.whatsapp_number ?? null);
       setChecking(false);
     });
     const {
       data: { subscription },
     } = metapilotSupabase.auth.onAuthStateChange((event, s) => {
-      // Only react to explicit sign-out. INITIAL_SESSION / TOKEN_REFRESHED
-      // can briefly fire with a transient null session and cause flash redirects.
       if (event === "SIGNED_OUT") navigate({ to: "/login", replace: true });
       else if (s?.user) setUser(s.user);
     });
@@ -126,6 +134,30 @@ function DashboardLayout() {
 
   if (checking) {
     return <FullPageLoader label="Preparing your dashboard" />;
+  }
+
+  if (isAppOwner === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 bg-background">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold">Access Denied</h1>
+          <p className="text-muted-foreground">
+            This application is already owned by another user.
+            If you need access or support, please contact the administrator.
+          </p>
+          {whatsapp && (
+            <Button asChild className="w-full mt-4" style={{ background: "#25D366" }}>
+              <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer">
+                Contact on WhatsApp
+              </a>
+            </Button>
+          )}
+          <Button variant="outline" onClick={signOut} className="w-full mt-2">
+            Sign out
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (isApproved === false) {
