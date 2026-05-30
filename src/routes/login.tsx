@@ -1,8 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { createServerFn, useServerFn } from "@tanstack/react-start";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
-import { checkSignupsAllowed, resetApproval } from "@/lib/login.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,16 +20,11 @@ const getAuthRedirectUrl = () => {
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  loader: async () => {
-    const signupsAllowed = await checkSignupsAllowed();
-    return { signupsAllowed };
-  },
 });
 
 function LoginPage() {
-  const { signupsAllowed } = Route.useLoaderData();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">(signupsAllowed ? "signup" : "signin");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -53,19 +46,12 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        if (!signupsAllowed) {
-           throw new Error("Signups are currently disabled because the application already has an owner.");
-        }
         const { data, error } = await metapilotSupabase.auth.signUp({
           email, password,
           options: { emailRedirectTo: getAuthRedirectUrl() },
         });
         if (error) throw error;
         if (data.session?.user || data.user) {
-          const userId = data.session?.user?.id ?? data.user?.id;
-          if (userId) {
-            await resetApproval({ data: userId });
-          }
           if (data.session?.user) {
             toast.success("Account created");
             setMessage({ type: "success", text: "Account created. Opening dashboard…" });
@@ -119,7 +105,7 @@ function LoginPage() {
         </Link>
         <h1 className="text-2xl font-bold">{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-           {signupsAllowed ? "The first account becomes the owner." : "Signups are closed. Please log in."}
+           Access the dashboard or contact the owner.
         </p>
 
         {mode === "signin" && (
@@ -154,11 +140,9 @@ function LoginPage() {
           </div>
         )}
 
-        {signupsAllowed && (
-          <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="mt-4 w-full text-sm text-muted-foreground hover:text-foreground">
-            {mode === "signin" ? "No account? Sign up" : "Already have an account? Sign in"}
-          </button>
-        )}
+        <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="mt-4 w-full text-sm text-muted-foreground hover:text-foreground">
+          {mode === "signin" ? "No account? Sign up" : "Already have an account? Sign in"}
+        </button>
       </div>
     </div>
   );
