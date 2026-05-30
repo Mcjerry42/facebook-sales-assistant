@@ -68,32 +68,42 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   if (!senderId || !text || isEcho) return;
   if (senderId === pageId) return;
 
+  // Fetch config and settings in parallel
   const { data: cfg } = await metapilotSupabaseAdmin
     .from("fb_config")
     .select("page_access_token, page_id, user_id")
     .eq("page_id", pageId)
     .limit(1)
     .maybeSingle();
-  if (!cfg?.page_access_token) {
-    console.warn("No page_access_token configured; skipping reply");
+  if (!cfg?.page_access_token || !cfg?.user_id) {
+    console.warn("No page_access_token or user_id configured; skipping reply");
     return;
   }
 
-  const { data: settings } = await metapilotSupabaseAdmin
-    .from("ai_settings")
-    .select("*")
-    .eq("user_id", cfg.user_id)
-    .limit(1)
-    .maybeSingle();
+  // Fetch settings, KB, and find conversation in parallel
+  const [settingsRes, kbRes, convRes] = await Promise.all([
+    metapilotSupabaseAdmin
+      .from("ai_settings")
+      .select("*")
+      .eq("user_id", cfg.user_id)
+      .limit(1)
+      .maybeSingle(),
+    metapilotSupabaseAdmin
+      .from("knowledge_entries")
+      .select("question,answer,category")
+      .eq("user_id", cfg.user_id)
+      .limit(200),
+    metapilotSupabaseAdmin
+      .from("conversations")
+      .select("*")
+      .eq("user_id", cfg.user_id)
+      .eq("fb_user_id", senderId)
+      .maybeSingle(),
+  ]);
 
-  // Find or create conversation
-  let { data: conv } = await metapilotSupabaseAdmin
-    .from("conversations")
-    .select("*")
-    .eq("user_id", cfg.user_id)
-    .eq("user_id", cfg.user_id)
-    .eq("fb_user_id", senderId)
-    .maybeSingle();
+  const settings = settingsRes.data;
+  const kb = kbRes.data;
+  let conv = convRes.data;
 
   let fbUserName: string | null = null;
   let fbUserAvatar: string | null = null;
@@ -133,32 +143,27 @@ async function handleMessagingEvent(ev: any, pageId: string) {
       .eq("id", conv.id);
   }
 
-  // Save inbound message
-  await metapilotSupabaseAdmin.from("messages").insert({
-    user_id: cfg.user_id,
-    conversation_id: conv.id,
-    sender: "user",
-    text,
-    is_ai: false,
-  });
+  // Save inbound message and load history in parallel
+  const [historyRes] = await Promise.all([
+    metapilotSupabaseAdmin
+      .from("messages")
+      .select("sender,text,is_ai,created_at")
+      .eq("conversation_id", conv.id)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    metapilotSupabaseAdmin.from("messages").insert({
+      user_id: cfg.user_id,
+      conversation_id: conv.id,
+      sender: "user",
+      text,
+      is_ai: false,
+    }),
+  ]);
+  const history = historyRes.data;
 
   // Stop here if human takeover or auto-reply disabled
   if (conv.human_takeover) return;
   if (settings && settings.auto_reply_messages === false) return;
-
-  // Load knowledge base (recent history is also nice but keep it simple)
-  const { data: kb } = await metapilotSupabaseAdmin
-    .from("knowledge_entries")
-    .select("question,answer,category")
-    .eq("user_id", cfg.user_id)
-    .limit(200);
-
-  const { data: history } = await metapilotSupabaseAdmin
-    .from("messages")
-    .select("sender,text,is_ai,created_at")
-    .eq("conversation_id", conv.id)
-    .order("created_at", { ascending: false })
-    .limit(10);
 
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) {
@@ -169,7 +174,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
   const { generateText } = await import("ai");
   const gateway = createLovableAiGatewayProvider(apiKey);
-  const model = gateway(settings?.model ?? "google/gemini-1.5-flash");
+  const model = gateway(settings?.model ?? "google/gemini-2.0-flash");
   const kbText = (kb ?? [])
     .map((k: any) => `Q: ${k.question}\nA: ${k.answer}`)
     .join("\n---\n");
@@ -210,6 +215,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
     const errText = await sendRes.text();
     console.error("FB send failed", sendRes.status, errText);
     await metapilotSupabaseAdmin.from("analytics_events").insert({
+      user_id: cfg.user_id,
       event_type: "fb_send_failed",
       meta: { status: sendRes.status, body: errText },
     });
@@ -236,7 +242,8 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   try {
     await tryExtractAndSaveOrder({
       conversationId: conv.id,
-      model: settings?.model ?? "google/gemini-1.5-flash",
+      model: settings?.model ?? "google/gemini-2.0-flash",
+      userId: cfg.user_id,
     });
   } catch (err) {
     console.error("order extraction error", err);
@@ -264,7 +271,7 @@ async function handleFeedChange(change: any, pageId: string) {
     .eq("page_id", pageId)
     .limit(1)
     .maybeSingle();
-  if (!cfg?.page_access_token) return;
+  if (!cfg?.page_access_token || !cfg?.user_id) return;
 
   const monitored: string[] = cfg.monitored_post_ids ?? [];
   // Match either the full post_id ("pageId_postId") or just the suffix.
@@ -278,12 +285,22 @@ async function handleFeedChange(change: any, pageId: string) {
     return;
   }
 
-  const { data: settings } = await metapilotSupabaseAdmin
-    .from("ai_settings")
-    .select("*")
-    .eq("user_id", cfg.user_id)
-    .limit(1)
-    .maybeSingle();
+  const [settingsRes, kbRes2] = await Promise.all([
+    metapilotSupabaseAdmin
+      .from("ai_settings")
+      .select("*")
+      .eq("user_id", cfg.user_id)
+      .limit(1)
+      .maybeSingle(),
+    metapilotSupabaseAdmin
+      .from("knowledge_entries")
+      .select("question,answer,category")
+      .eq("user_id", cfg.user_id)
+      .limit(200),
+  ]);
+
+  const settings = settingsRes.data;
+  const kb = kbRes2.data;
 
   // Record the comment
   await metapilotSupabaseAdmin.from("comments").insert({
@@ -301,17 +318,11 @@ async function handleFeedChange(change: any, pageId: string) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return;
 
-  const { data: kb } = await metapilotSupabaseAdmin
-    .from("knowledge_entries")
-    .select("question,answer,category")
-    .eq("user_id", cfg.user_id)
-    .limit(200);
-
   const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
   const { generateText, Output } = await import("ai");
   const { z } = await import("zod");
   const gateway = createLovableAiGatewayProvider(apiKey);
-  const model = gateway(settings?.model ?? "google/gemini-1.5-flash");
+  const model = gateway(settings?.model ?? "google/gemini-2.0-flash");
   const kbText = (kb ?? []).map((k: any) => `Q: ${k.question}\nA: ${k.answer}`).join("\n---\n");
 
   const system = `${settings?.system_instructions ?? ""}
@@ -365,14 +376,14 @@ ${kbText || "(empty)"}`;
           .eq("comment_id", commentId);
         await metapilotSupabaseAdmin.from("analytics_events").insert({
           user_id: cfg.user_id,
-      event_type: "fb_comment_hidden",
+          event_type: "fb_comment_hidden",
           meta: { post_id: postId, comment_id: commentId },
         });
       } else {
         const errText = await hideRes.text();
         await metapilotSupabaseAdmin.from("analytics_events").insert({
           user_id: cfg.user_id,
-      event_type: "fb_comment_hide_failed",
+          event_type: "fb_comment_hide_failed",
           meta: { status: hideRes.status, body: errText, comment_id: commentId },
         });
       }
@@ -394,7 +405,7 @@ ${kbText || "(empty)"}`;
       const errText = await replyRes.text();
       await metapilotSupabaseAdmin.from("analytics_events").insert({
         user_id: cfg.user_id,
-      event_type: "fb_comment_reply_failed",
+        event_type: "fb_comment_reply_failed",
         meta: { status: replyRes.status, body: errText, post_id: postId },
       });
     } else {
@@ -404,7 +415,7 @@ ${kbText || "(empty)"}`;
         .eq("comment_id", commentId);
       await metapilotSupabaseAdmin.from("analytics_events").insert({
         user_id: cfg.user_id,
-      event_type: "fb_comment_replied",
+        event_type: "fb_comment_replied",
         meta: { post_id: postId, comment_id: commentId },
       });
     }
@@ -428,7 +439,7 @@ ${kbText || "(empty)"}`;
       const errText = await pmRes.text();
       await metapilotSupabaseAdmin.from("analytics_events").insert({
         user_id: cfg.user_id,
-      event_type: "fb_comment_dm_failed",
+        event_type: "fb_comment_dm_failed",
         meta: { status: pmRes.status, body: errText, comment_id: commentId },
       });
     } else {
@@ -438,7 +449,7 @@ ${kbText || "(empty)"}`;
         .eq("comment_id", commentId);
       await metapilotSupabaseAdmin.from("analytics_events").insert({
         user_id: cfg.user_id,
-      event_type: "fb_comment_dm_sent",
+        event_type: "fb_comment_dm_sent",
         meta: { comment_id: commentId },
       });
     }

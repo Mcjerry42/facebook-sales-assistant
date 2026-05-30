@@ -30,7 +30,7 @@ export async function tryExtractAndSaveOrder(args: {
     .select("sender,text,is_ai,created_at")
     .eq("conversation_id", args.conversationId)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(40);
   const recent = (history ?? []).slice().reverse();
   if (recent.length < 2) return { saved: false, reason: "too_short" };
 
@@ -43,22 +43,37 @@ export async function tryExtractAndSaveOrder(args: {
   const gateway = createLovableAiGatewayProvider(apiKey);
   const model = gateway(args.model);
 
-  const system = `You extract orders from chat transcripts (Bengali / English / Banglish).
-  Return STRICT JSON only, no markdown, matching this TypeScript type:
-  { "is_order": boolean, "customer_name": string|null, "phone": string|null, "address": string|null, "items": Array<{ "name": string, "quantity": number, "price": number|null }>, "total": number|null, "notes": string|null }
+  const system = `You are an expert order extraction system for e-commerce chat transcripts in Bengali / English / Banglish.
 
-  Rules:
-  - "is_order" = true ONLY if the customer has CONFIRMED an order AND we have at least: name, phone, address, and at least one item.
-  - Phone must look like a valid phone number (can contain digits, spaces, hyphens, parentheses, or +; must have at least 8 digits). If unsure, set is_order=false.
-  - If anything required is missing or ambiguous, set is_order=false and leave fields null.
-  - Do NOT invent data. If the customer is only asking questions, is_order=false.`;
+Your job is to read the ENTIRE conversation carefully and extract any confirmed order.
+
+Return STRICT JSON only (no markdown fences, no extra text), matching this schema:
+{
+  "is_order": boolean,
+  "customer_name": string | null,
+  "phone": string | null,
+  "address": string | null,
+  "items": [{ "name": string, "quantity": number, "price": number | null }],
+  "total": number | null,
+  "notes": string | null
+}
+
+IMPORTANT RULES:
+1. "is_order" = true when the AGENT has confirmed/acknowledged an order OR the customer has clearly placed an order by providing their details (name, phone, address).
+2. For "items", look through the ENTIRE conversation to find what product(s) were discussed. The product name might have been mentioned much earlier in the chat, not just in the final messages. Extract the SPECIFIC product name (e.g. "স্মার্ট ওয়াচ T800", "কালো জুতা সাইজ ৪২"), NOT generic words like "পণ্য" or "product".
+3. If the customer discussed a specific product earlier and then later gave name/phone/address without re-stating the product, the item is STILL that specific product from earlier in the conversation.
+4. Phone must have at least 8 digits. Bangladeshi numbers starting with 01 are valid.
+5. Be lenient: if the customer gave name + phone + address and discussed at least one product, AND the agent confirmed or said "order confirmed" / "অর্ডার কনফার্ম" or similar, mark is_order=true.
+6. Price can be null if not explicitly stated. That's OK — the order is still valid.
+7. Do NOT invent data that doesn't exist anywhere in the transcript.
+8. If the customer is ONLY asking questions without providing contact details, is_order=false.`;
 
   let parsed: any = null;
   try {
     const result = await generateText({
       model,
       system,
-      prompt: `Transcript:\n${transcript}\n\nReturn JSON only.`,
+      prompt: `Full Chat Transcript:\n${transcript}\n\nExtract the order. Return JSON only.`,
     });
     const text = result.text?.trim() ?? "";
     const jsonStr = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
@@ -163,8 +178,16 @@ async function pushOrderToSheet(order: any, userId: string) {
       notes: order.notes,
     }),
   });
-  await metapilotSupabaseAdmin
+  const { data: sheetRow } = await metapilotSupabaseAdmin
     .from("sheets_config")
-    .update({ orders_last_synced_at: new Date().toISOString() })
-    .eq("id", (await metapilotSupabaseAdmin.from("sheets_config").select("id").eq("user_id", userId).limit(1).maybeSingle()).data!.id);
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  if (sheetRow?.id) {
+    await metapilotSupabaseAdmin
+      .from("sheets_config")
+      .update({ orders_last_synced_at: new Date().toISOString() })
+      .eq("id", sheetRow.id);
+  }
 }
