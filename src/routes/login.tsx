@@ -2,28 +2,12 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { createServerFn, useServerFn } from "@tanstack/react-start";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
-import { metapilotSupabaseAdmin } from "@/lib/metapilot-supabase.server";
+import { checkSignupsAllowed, resetApproval } from "@/lib/login.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
-
-const checkSignupsAllowed = createServerFn({ method: "GET" }).handler(async () => {
-  const { count } = await metapilotSupabaseAdmin
-    .from("profiles")
-    .select("*", { count: "exact", head: true });
-  return (count ?? 0) === 0;
-});
-
-const resetApproval = createServerFn({ method: "POST" })
-  .validator((d: string) => d)
-  .handler(async ({ data }) => {
-    // Override the DB trigger that auto-approves the first user
-    await metapilotSupabaseAdmin.from("profiles").update({ is_approved: false }).eq("id", data);
-    return true;
-  });
-
 const APP_URL = "https://id-preview--5c37c6b8-2d4f-4901-bfe7-810baaba3f65.lovable.app";
 const getAuthRedirectUrl = () => {
   if (typeof window === "undefined") return `${APP_URL}/dashboard`;
