@@ -16,6 +16,14 @@ const checkSignupsAllowed = createServerFn({ method: "GET" }).handler(async () =
   return (count ?? 0) === 0;
 });
 
+const resetApproval = createServerFn({ method: "POST" })
+  .validator((d: string) => d)
+  .handler(async ({ data }) => {
+    // Override the DB trigger that auto-approves the first user
+    await metapilotSupabaseAdmin.from("profiles").update({ is_approved: false }).eq("id", data);
+    return true;
+  });
+
 const APP_URL = "https://id-preview--5c37c6b8-2d4f-4901-bfe7-810baaba3f65.lovable.app";
 const getAuthRedirectUrl = () => {
   if (typeof window === "undefined") return `${APP_URL}/dashboard`;
@@ -69,14 +77,20 @@ function LoginPage() {
           options: { emailRedirectTo: getAuthRedirectUrl() },
         });
         if (error) throw error;
-        if (data.session?.user) {
-          toast.success("Account created");
-          setMessage({ type: "success", text: "Account created. Opening dashboard…" });
-          navigate({ to: "/dashboard", replace: true });
-        } else {
-          toast.success("Account created");
-          setMessage({ type: "success", text: "Account created. Please sign in now." });
-          setMode("signin");
+        if (data.session?.user || data.user) {
+          const userId = data.session?.user?.id ?? data.user?.id;
+          if (userId) {
+            await resetApproval({ data: userId });
+          }
+          if (data.session?.user) {
+            toast.success("Account created");
+            setMessage({ type: "success", text: "Account created. Opening dashboard…" });
+            navigate({ to: "/dashboard", replace: true });
+          } else {
+            toast.success("Account created");
+            setMessage({ type: "success", text: "Account created. Please sign in now." });
+            setMode("signin");
+          }
         }
       } else {
         const { data, error } = await metapilotSupabase.auth.signInWithPassword({ email, password });

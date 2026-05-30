@@ -42,6 +42,16 @@ async function assertApproved(supabase: unknown, userId: string) {
   }
 }
 
+export const fixFirstUserApproval = createServerFn({ method: "POST" })
+  .middleware([requireMetapilotAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
+    // Set is_approved to false
+    await metapilotSupabaseAdmin.from("profiles").update({ is_approved: false }).eq("id", userId);
+    // Delete the admin role so this fix only runs once
+    await metapilotSupabaseAdmin.from("user_roles").delete().eq("user_id", userId).eq("role", "admin");
+    return true;
+  });
 
 export const getDashboardOverview = createServerFn({ method: "GET" })
   .middleware([requireMetapilotAuth])

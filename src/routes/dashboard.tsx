@@ -9,6 +9,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
+import { fixFirstUserApproval } from "@/lib/dashboard.functions";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -82,7 +83,7 @@ function DashboardLayout() {
       }
       const u = data.session.user;
       setUser(u);
-      const [{ data: profile }, { data: allProfiles }, { data: settings }] = await Promise.all([
+      const [{ data: profile }, { data: allProfiles }, { data: settings }, { data: roleRow }] = await Promise.all([
         metapilotSupabase
           .from("profiles")
           .select("is_approved, approved_until")
@@ -98,15 +99,33 @@ function DashboardLayout() {
           .select("whatsapp_number")
           .limit(1)
           .maybeSingle(),
+        metapilotSupabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", u.id)
+          .eq("role", "admin")
+          .maybeSingle(),
       ]);
       if (!mounted) return;
-      const notExpired =
-        !profile?.approved_until || new Date(profile.approved_until).getTime() > Date.now();
-      const approved = !!profile?.is_approved && notExpired;
+      
       const ownerId = allProfiles?.[0]?.id;
+      const isOwner = ownerId === u.id;
+      const notExpired = !profile?.approved_until || new Date(profile.approved_until).getTime() > Date.now();
+      
+      let approved = !!profile?.is_approved && notExpired;
+      
+      if (isOwner && roleRow?.role === "admin") {
+        // The DB trigger auto-approved them. Force override to false!
+        try {
+          await fixFirstUserApproval();
+        } catch (e) {
+          console.error("Failed to fix approval", e);
+        }
+        approved = false; // Block them immediately for this session
+      }
       
       setIsApproved(approved);
-      setIsAppOwner(ownerId === u.id);
+      setIsAppOwner(isOwner);
       setWhatsapp(settings?.whatsapp_number ?? null);
       setChecking(false);
     });
