@@ -9,6 +9,7 @@ import { metapilotSupabaseAdmin } from "@/lib/metapilot-supabase.server";
 export async function tryExtractAndSaveOrder(args: {
   conversationId: string;
   model: string;
+  userId: string;
 }) {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return { saved: false, reason: "no_api_key" };
@@ -66,6 +67,7 @@ export async function tryExtractAndSaveOrder(args: {
     console.error("order extraction failed", err);
     try {
       await metapilotSupabaseAdmin.from("analytics_events").insert({
+        user_id: args.userId,
         event_type: "order_extraction_failed",
         meta: {
           conversation_id: args.conversationId,
@@ -81,6 +83,7 @@ export async function tryExtractAndSaveOrder(args: {
   // Log the extraction attempt with parsed results
   try {
     await metapilotSupabaseAdmin.from("analytics_events").insert({
+      user_id: args.userId,
       event_type: "order_extraction_attempt",
       meta: {
         conversation_id: args.conversationId,
@@ -107,6 +110,7 @@ export async function tryExtractAndSaveOrder(args: {
   const { data: inserted, error } = await metapilotSupabaseAdmin
     .from("orders")
     .insert({
+      user_id: args.userId,
       conversation_id: args.conversationId,
       customer_name: String(parsed.customer_name).slice(0, 200),
       phone: String(parsed.phone).slice(0, 50),
@@ -126,7 +130,7 @@ export async function tryExtractAndSaveOrder(args: {
 
   // Best-effort push to Google Sheets if a sheet URL is configured.
   try {
-    await pushOrderToSheet(inserted);
+    await pushOrderToSheet(inserted, args.userId);
   } catch (err) {
     console.error("sheet push failed", err);
   }
@@ -134,10 +138,11 @@ export async function tryExtractAndSaveOrder(args: {
   return { saved: true, order: inserted };
 }
 
-async function pushOrderToSheet(order: any) {
+async function pushOrderToSheet(order: any, userId: string) {
   const { data: cfg } = await metapilotSupabaseAdmin
     .from("sheets_config")
     .select("orders_sheet_url")
+    .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
   const url = cfg?.orders_sheet_url;
@@ -161,5 +166,5 @@ async function pushOrderToSheet(order: any) {
   await metapilotSupabaseAdmin
     .from("sheets_config")
     .update({ orders_last_synced_at: new Date().toISOString() })
-    .eq("id", (await metapilotSupabaseAdmin.from("sheets_config").select("id").limit(1).maybeSingle()).data!.id);
+    .eq("id", (await metapilotSupabaseAdmin.from("sheets_config").select("id").eq("user_id", userId).limit(1).maybeSingle()).data!.id);
 }

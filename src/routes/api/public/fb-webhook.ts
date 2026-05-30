@@ -169,7 +169,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
   const { generateText } = await import("ai");
   const gateway = createLovableAiGatewayProvider(apiKey);
-  const model = gateway(settings?.model ?? "google/gemini-3-flash-preview");
+  const model = gateway(settings?.model ?? "google/gemini-1.5-flash");
   const kbText = (kb ?? [])
     .map((k: any) => `Q: ${k.question}\nA: ${k.answer}`)
     .join("\n---\n");
@@ -236,7 +236,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   try {
     await tryExtractAndSaveOrder({
       conversationId: conv.id,
-      model: settings?.model ?? "google/gemini-3-flash-preview",
+      model: settings?.model ?? "google/gemini-1.5-flash",
     });
   } catch (err) {
     console.error("order extraction error", err);
@@ -311,7 +311,7 @@ async function handleFeedChange(change: any, pageId: string) {
   const { generateText, Output } = await import("ai");
   const { z } = await import("zod");
   const gateway = createLovableAiGatewayProvider(apiKey);
-  const model = gateway(settings?.model ?? "google/gemini-3-flash-preview");
+  const model = gateway(settings?.model ?? "google/gemini-1.5-flash");
   const kbText = (kb ?? []).map((k: any) => `Q: ${k.question}\nA: ${k.answer}`).join("\n---\n");
 
   const system = `${settings?.system_instructions ?? ""}

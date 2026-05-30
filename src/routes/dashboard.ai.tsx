@@ -15,7 +15,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/ai")({ ssr: false, component: AiSettingsPage });
 
 const MODELS = [
-  "google/gemini-3-flash-preview",
+  "google/gemini-1.5-flash",
   "google/gemini-2.5-flash",
   "google/gemini-2.5-pro",
   "openai/gpt-5-mini",
@@ -24,7 +24,7 @@ const MODELS = [
 
 const DEFAULT_FORM = {
   provider: "lovable",
-  model: "google/gemini-3-flash-preview",
+  model: "google/gemini-1.5-flash",
   api_key: null,
   system_instructions: "You are a friendly Bengali/English sales agent. Reply in the same language as the customer.",
   language_mode: "auto",
