@@ -74,6 +74,22 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   
   const messageText = text || "";
 
+  // Build a display text based on attachments (for DB storage)
+  function buildDisplayText(): string {
+    if (messageText) return messageText;
+    const parts: string[] = [];
+    for (const att of attachments) {
+      const t = att.type || "attachment";
+      if (t === "audio" || t === "voice") parts.push("[Audio message]");
+      else if (t === "image") parts.push("[Image]");
+      else if (t === "video") parts.push("[Video]");
+      else if (t === "file") parts.push("[File]");
+      else parts.push(`[${t}]`);
+    }
+    return parts.join(" ") || "[Attachment]";
+  }
+  const displayText = buildDisplayText();
+
   // Download and process image/audio attachments from Facebook
   async function downloadFbAttachment(url: string): Promise<{ base64: string; mime: string } | null> {
     try {
@@ -172,7 +188,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
         fb_user_id: senderId,
         fb_user_name: fbUserName,
         fb_user_avatar: fbUserAvatar,
-        last_message: text,
+        last_message: displayText,
         last_message_at: new Date().toISOString(),
         unread_count: 1,
       })
@@ -183,7 +199,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
     await metapilotSupabaseAdmin
       .from("conversations")
       .update({
-        last_message: text,
+        last_message: displayText,
         last_message_at: new Date().toISOString(),
         unread_count: (conv.unread_count ?? 0) + 1,
       })
@@ -202,7 +218,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
       user_id: cfg.user_id,
       conversation_id: conv.id,
       sender: "user",
-      text,
+      text: displayText,
       is_ai: false,
     }),
   ]);
