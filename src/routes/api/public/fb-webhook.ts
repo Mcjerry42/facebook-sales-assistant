@@ -105,6 +105,7 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   const imageContents: Array<{ type: "image"; image: string }> = [];
   let hasAudio = false;
   let audioCaptions: string[] = [];
+  const audioBuffers: ArrayBuffer[] = [];
 
   for (const att of attachments) {
     const attType: string = att.type || "";
@@ -120,13 +121,68 @@ async function handleMessagingEvent(ev: any, pageId: string) {
       }
     } else if (attType === "audio" || attType === "voice") {
       hasAudio = true;
-      // Try to get audio duration / info from payload
       const duration = att.payload?.duration || 0;
       audioCaptions.push(`[Audio message${duration ? ` (${Math.round(duration/1000)}s)` : ""}]`);
+      // Download audio for transcription
+      if (payloadUrl) {
+        try {
+          const buf = await downloadFbAttachment(payloadUrl);
+          if (buf) {
+            const audioData = Buffer.from(buf.base64, "base64");
+            audioBuffers.push(audioData);
+          }
+        } catch {}
+      }
     } else if (payloadUrl) {
-      // Unknown attachment type — note it
       audioCaptions.push(`[${attType} attachment]`);
     }
+  }
+
+  // --- Vision: use Gemini via OpenRouter to analyze images ---
+  async function analyzeImageWithGemini(base64DataUrl: string, apiKey: string): Promise<string | null> {
+    try {
+      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-2.0-flash-001",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: "You are a sales agent assistant. Analyze this customer's image and describe what you see in Bengali/English. If it's a product photo, describe the product details. If it's a screenshot, describe the conversation. Be concise." },
+              { type: "image_url", image_url: { url: base64DataUrl } },
+            ],
+          }],
+          max_tokens: 200,
+        }),
+      });
+      const j = await r.json();
+      return j.choices?.[0]?.message?.content || null;
+    } catch { return null; }
+  }
+
+  // --- Audio: use Gemini to transcribe audio ---
+  async function transcribeWithGemini(audioBuf: ArrayBuffer, apiKey: string): Promise<string | null> {
+    try {
+      const base64 = Buffer.from(audioBuf).toString("base64");
+      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-2.0-flash-001",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: "Transcribe this audio message exactly as spoken. The customer is speaking Bengali or English. Reply only with the transcription." },
+              { type: "input_audio", input_audio: { data: base64, format: "wav" } },
+            ],
+          }],
+          max_tokens: 200,
+        }),
+      });
+      const j = await r.json();
+      return j.choices?.[0]?.message?.content || null;
+    } catch { return null; }
   }
 
   // Fetch config and settings in parallel
@@ -255,16 +311,34 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   
   // Since history was fetched in parallel with the insert, it might not contain the current message
   // Just in case, append the current message.
-  // Build multimodal content if there are images/audio
-  const hasMedia = imageContents.length > 0 || hasAudio;
-  const currentContent = hasMedia
-    ? [
-        ...(messageText ? [{ type: "text" as const, text: messageText }] : []),
-        ...(hasAudio ? [{ type: "text" as const, text: `The user sent an audio message. ${audioCaptions.join(". ")} They may be asking about something they mentioned verbally. Respond helpfully.` }] : []),
-        ...imageContents,
-      ]
-    : messageText;
-  recent.push({ role: "user", content: currentContent });
+  // Analyze images and transcribe audio before sending to main AI (DeepSeek)
+  const apiKey = settings?.api_key ?? "";
+  const extraContext: string[] = [];
+
+  // Use Gemini to analyze each image
+  for (const img of imageContents) {
+    if (img.type === "image") {
+      const desc = await analyzeImageWithGemini(img.image, apiKey);
+      if (desc) extraContext.push(`[Customer's image: ${desc}]`);
+    }
+  }
+
+  // Use Gemini to transcribe audio
+  for (const buf of audioBuffers) {
+    if (buf) {
+      const transcript = await transcribeWithGemini(buf, apiKey);
+      if (transcript) extraContext.push(`[Customer's audio transcription: ${transcript}]`);
+    }
+  }
+
+  // Build the message for the main AI
+  const fullMessage = [
+    messageText,
+    ...extraContext,
+    ...(hasAudio && !extraContext.some(e => e.includes("transcription")) ? ["[Customer sent an audio message but it couldn't be transcribed. Please ask them to type their message instead.]"] : []),
+  ].filter(Boolean).join("\n");
+
+  recent.push({ role: "user", content: fullMessage || displayText });
 
   let replyText = "";
   try {
