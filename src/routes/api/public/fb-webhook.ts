@@ -65,8 +65,53 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   const senderId: string | undefined = ev?.sender?.id;
   const text: string | undefined = ev?.message?.text;
   const isEcho: boolean = !!ev?.message?.is_echo;
-  if (!senderId || !text || isEcho) return;
+  const attachments: any[] = ev?.message?.attachments ?? [];
+  const hasAttachments = attachments.length > 0;
+  if (!senderId || isEcho) return;
   if (senderId === pageId) return;
+  // If there's no text AND no attachments, nothing to process
+  if (!text && !hasAttachments) return;
+  
+  const messageText = text || "";
+
+  // Download and process image/audio attachments from Facebook
+  async function downloadFbAttachment(url: string): Promise<{ base64: string; mime: string } | null> {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const buf = await res.arrayBuffer();
+      const mime = res.headers.get("content-type") || "image/jpeg";
+      const base64 = Buffer.from(buf).toString("base64");
+      return { base64, mime };
+    } catch { return null; }
+  }
+
+  const imageContents: Array<{ type: "image"; image: string }> = [];
+  let hasAudio = false;
+  let audioCaptions: string[] = [];
+
+  for (const att of attachments) {
+    const attType: string = att.type || "";
+    const payloadUrl: string | undefined = att.payload?.url;
+    
+    if (attType === "image" && payloadUrl) {
+      const downloaded = await downloadFbAttachment(payloadUrl);
+      if (downloaded) {
+        imageContents.push({
+          type: "image",
+          image: `data:${downloaded.mime};base64,${downloaded.base64}`,
+        });
+      }
+    } else if (attType === "audio" || attType === "voice") {
+      hasAudio = true;
+      // Try to get audio duration / info from payload
+      const duration = att.payload?.duration || 0;
+      audioCaptions.push(`[Audio message${duration ? ` (${Math.round(duration/1000)}s)` : ""}]`);
+    } else if (payloadUrl) {
+      // Unknown attachment type — note it
+      audioCaptions.push(`[${attType} attachment]`);
+    }
+  }
 
   // Fetch config and settings in parallel
   const { data: cfg } = await metapilotSupabaseAdmin
@@ -194,7 +239,16 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   
   // Since history was fetched in parallel with the insert, it might not contain the current message
   // Just in case, append the current message.
-  recent.push({ role: "user", content: text });
+  // Build multimodal content if there are images/audio
+  const hasMedia = imageContents.length > 0 || hasAudio;
+  const currentContent = hasMedia
+    ? [
+        ...(messageText ? [{ type: "text" as const, text: messageText }] : []),
+        ...(hasAudio ? [{ type: "text" as const, text: `The user sent an audio message. ${audioCaptions.join(". ")} They may be asking about something they mentioned verbally. Respond helpfully.` }] : []),
+        ...imageContents,
+      ]
+    : messageText;
+  recent.push({ role: "user", content: currentContent });
 
   let replyText = "";
   try {
