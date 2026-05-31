@@ -104,6 +104,7 @@ const AiSettingsSchema = z.object({
   provider: z.enum(["lovable", "openai", "gemini"]),
   model: z.string().min(1).max(100),
   api_key: z.string().max(500).nullable().optional(),
+  base_url: z.string().max(500).nullable().optional(),
   system_instructions: z.string().max(8000),
   language_mode: z.enum(["auto", "bn", "en"]),
   auto_reply_messages: z.boolean(),
@@ -126,11 +127,11 @@ export const saveAiSettings = createServerFn({ method: "POST" })
     if (existing) {
       const { error } = await supabase
         .from("ai_settings")
-        .update({ ...data, updated_at: new Date().toISOString() })
+        .update({ ...(data as any), updated_at: new Date().toISOString() })
         .eq("id", existing.id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await supabase.from("ai_settings").insert(data);
+      const { error } = await supabase.from("ai_settings").insert(data as any);
       if (error) throw new Error(error.message);
     }
     return { ok: true };
@@ -308,13 +309,16 @@ export const askAi = createServerFn({ method: "POST" })
       .select("question,answer,category")
       .limit(200);
 
-    const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
-    const { generateText } = await import("ai");
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
+  const { createAiProvider } = await import("@/lib/ai-gateway.server");
+  const { generateText } = await import("ai");
 
-    const gateway = createLovableAiGatewayProvider(apiKey);
-    const model = gateway(settings?.model ?? "google/gemini-3-flash-preview");
+  const gateway = createAiProvider({
+    provider: settings?.provider ?? "lovable",
+    model: settings?.model ?? "google/gemini-3-flash-preview",
+    api_key: settings?.api_key ?? null,
+    base_url: (settings as any)?.base_url ?? null,
+  });
+  const model = gateway(settings?.model ?? "google/gemini-3-flash-preview");
     const kbText = ((kb ?? []) as KnowledgeEntry[])
       .map((k) => `Q: ${k.question}\nA: ${k.answer}`)
       .join("\n---\n");

@@ -20,6 +20,8 @@ const MODELS = [
   "google/gemini-2.5-pro",
   "openai/gpt-5-mini",
   "openai/gpt-5",
+  "deepseek-chat",
+  "deepseek-reasoner",
 ];
 
 const DEFAULT_FORM = {
@@ -45,6 +47,7 @@ function AiSettingsPage() {
   const [keywordsText, setKeywordsText] = useState("");
   const [testInput, setTestInput] = useState("");
   const [testOutput, setTestOutput] = useState("");
+  const [showBaseUrl, setShowBaseUrl] = useState(false);
 
   useEffect(() => {
     if (!data || form) return;
@@ -106,10 +109,35 @@ function AiSettingsPage() {
             </Select>
           </div>
           {form.provider !== "lovable" && (
-            <div className="md:col-span-2">
-              <Label>API Key</Label>
-              <Input type="password" value={form.api_key ?? ""} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder="sk-..." />
-            </div>
+            <>
+              <div className="md:col-span-2">
+                <Label>API Key</Label>
+                <Input type="password" value={form.api_key ?? ""} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder="sk-..." />
+              </div>
+              <div className="md:col-span-2">
+                <div className="flex items-center gap-2">
+                  <Label>Custom Base URL (optional)</Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowBaseUrl(!showBaseUrl)}
+                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                  >
+                    {showBaseUrl ? "Hide" : "Show"}
+                  </button>
+                </div>
+                {showBaseUrl && (
+                  <Input
+                    value={form.base_url ?? ""}
+                    onChange={(e) => setForm({ ...form, base_url: e.target.value })}
+                    placeholder="https://api.deepseek.com/v1"
+                    className="mt-1"
+                  />
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Leave empty for default. For DeepSeek use: <code className="text-xs bg-secondary px-1 rounded">https://api.deepseek.com/v1</code>
+                </p>
+              </div>
+            </>
           )}
           <div>
             <Label>Language</Label>

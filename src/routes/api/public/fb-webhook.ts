@@ -167,16 +167,22 @@ async function handleMessagingEvent(ev: any, pageId: string) {
   if (conv.human_takeover) return;
   if (settings && settings.auto_reply_messages === false) return;
 
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) {
-    console.error("Missing LOVABLE_API_KEY");
+  const { createAiProvider } = await import("@/lib/ai-gateway.server");
+  const { generateText } = await import("ai");
+
+  let model;
+  try {
+    const gateway = createAiProvider({
+      provider: settings?.provider ?? "lovable",
+      model: settings?.model ?? "google/gemini-2.0-flash",
+      api_key: settings?.api_key ?? null,
+      base_url: (settings as any)?.base_url ?? null,
+    });
+    model = gateway(settings?.model ?? "google/gemini-2.0-flash");
+  } catch (err) {
+    console.error("AI provider creation failed:", err);
     return;
   }
-
-  const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
-  const { generateText } = await import("ai");
-  const gateway = createLovableAiGatewayProvider(apiKey);
-  const model = gateway(settings?.model ?? "google/gemini-2.0-flash");
   const kbText = (kb ?? [])
     .map((k: any) => `Q: ${k.question}\nA: ${k.answer}`)
     .join("\n---\n");
@@ -321,14 +327,23 @@ async function handleFeedChange(change: any, pageId: string) {
 
   if (settings && settings.auto_reply_comments === false) return;
 
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return;
-
-  const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
+  const { createAiProvider } = await import("@/lib/ai-gateway.server");
   const { generateText, Output } = await import("ai");
   const { z } = await import("zod");
-  const gateway = createLovableAiGatewayProvider(apiKey);
-  const model = gateway(settings?.model ?? "google/gemini-2.0-flash");
+
+  let model;
+  try {
+    const gateway = createAiProvider({
+      provider: settings?.provider ?? "lovable",
+      model: settings?.model ?? "google/gemini-2.0-flash",
+      api_key: settings?.api_key ?? null,
+      base_url: (settings as any)?.base_url ?? null,
+    });
+    model = gateway(settings?.model ?? "google/gemini-2.0-flash");
+  } catch (err) {
+    console.error("AI provider creation failed:", err);
+    return;
+  }
   const kbText = (kb ?? []).map((k: any) => `Q: ${k.question}\nA: ${k.answer}`).join("\n---\n");
 
   const system = `${settings?.system_instructions ?? ""}
