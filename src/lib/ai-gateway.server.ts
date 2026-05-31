@@ -60,6 +60,8 @@ function getDefaultBaseUrl(provider: string): string {
       return "https://api.mistral.ai/v1";
     case "together":
       return "https://api.together.xyz/v1";
+    case "openrouter":
+      return "https://openrouter.ai/api/v1";
     default:
       // If unknown provider, default to OpenAI-compatible format
       return `https://api.${provider}.com/v1`;
