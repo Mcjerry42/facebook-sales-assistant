@@ -58,20 +58,23 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
-    const [fb] = await Promise.all([
-      supabase.from("fb_config").select("*").eq("user_id", userId).limit(1).maybeSingle(),
-    ]);
+    // Use the existing 'clients' table
+    const { data: client } = await supabase
+      .from("clients" as any)
+      .select("*")
+      .limit(1)
+      .maybeSingle();
     return {
-      botEnabled: (fb.data as any)?.bot_enabled ?? false,
-      connected: (fb.data as any)?.connected ?? false,
-      pageName: (fb.data as any)?.page_name ?? null,
-      // Legacy fields for backward compatibility (no longer used in UI)
+      botEnabled: (client as any)?.status === "on",
+      connected: !!(client as any)?.page_token,
+      pageName: (client as any)?.page_id ?? null,
+      // Legacy fields for backward compatibility
       conversations: [],
       orders: [],
       comments: [],
       messageCount: 0,
       aiSettings: null,
-      fbConfig: fb.data,
+      fbConfig: client,
       sheetsConfig: null,
     };
   });
@@ -83,26 +86,24 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
     
-    // Ensure fb_config exists for this user
+    // Update the 'clients' table status field
     const { data: existing } = await supabase
-      .from("fb_config")
-      .select("id")
-      .eq("user_id", userId)
+      .from("clients" as any)
+      .select("page_id")
       .limit(1)
       .maybeSingle();
     
-    if (!existing) {
-      // Create fb_config for this user
-      const { error } = await supabase.from("fb_config").insert({
-        user_id: userId,
-        bot_enabled: data.enabled,
-      });
+    if (existing) {
+      const { error } = await supabase
+        .from("clients" as any)
+        .update({ status: data.enabled ? "on" : "off" } as any)
+        .eq("page_id", (existing as any).page_id);
       if (error) throw new Error(error.message);
     } else {
+      // Insert a new row with just the status
       const { error } = await supabase
-        .from("fb_config")
-        .update({ bot_enabled: data.enabled, updated_at: new Date().toISOString() })
-        .eq("id", existing.id);
+        .from("clients" as any)
+        .insert({ page_id: "pending", page_token: "", status: data.enabled ? "on" : "off" } as any);
       if (error) throw new Error(error.message);
     }
     
