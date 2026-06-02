@@ -58,10 +58,11 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
-    // Use the existing 'clients' table
+    // Use the existing 'clients' table - filter by logged-in user
     const { data: client } = await supabase
       .from("clients" as any)
       .select("*")
+      .eq("user_id", userId)
       .limit(1)
       .maybeSingle();
     return {
@@ -86,10 +87,11 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
     
-    // Update the 'clients' table status field
+    // Update the 'clients' table status field - filter by logged-in user
     const { data: existing } = await supabase
       .from("clients" as any)
       .select("page_id")
+      .eq("user_id", userId)
       .limit(1)
       .maybeSingle();
     
@@ -97,13 +99,14 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
       const { error } = await supabase
         .from("clients" as any)
         .update({ status: data.enabled ? "on" : "off" } as any)
-        .eq("page_id", (existing as any).page_id);
+        .eq("page_id", (existing as any).page_id)
+        .eq("user_id", userId);
       if (error) throw new Error(error.message);
     } else {
-      // Insert a new row with just the status
+      // Insert a new row for this user
       const { error } = await supabase
         .from("clients" as any)
-        .insert({ page_id: "pending", page_token: "", status: data.enabled ? "on" : "off" } as any);
+        .insert({ page_id: "pending", page_token: "", status: data.enabled ? "on" : "off", user_id: userId } as any);
       if (error) throw new Error(error.message);
     }
     
