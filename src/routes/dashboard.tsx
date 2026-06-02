@@ -131,17 +131,24 @@ function DashboardLayout() {
   const handleToggleBot = useCallback(async () => {
     if (toggling) return;
     setToggling(true);
-    const newState = !botEnabled;
+    const prev = botEnabled;
+    // Optimistically toggle UI
+    setBotEnabled(!prev);
     try {
-      await toggleBotEnabled({ data: { enabled: newState } });
-      setBotEnabled(newState);
-      toast.success(newState ? "Bot চালু হয়েছে!" : "Bot বন্ধ হয়েছে!");
+      await toggleBotEnabled({ data: { enabled: !prev } });
+      // Re-fetch to confirm actual DB state
+      const data = await getDashboardOverview();
+      setBotEnabled(data.botEnabled ?? !prev);
+      toast.success(data.botEnabled ? "Bot চালু হয়েছে!" : "Bot বন্ধ হয়েছে!");
     } catch (err) {
+      // Revert on error
+      setBotEnabled(prev);
       toast.error("সমস্যা হয়েছে, আবার চেষ্টা করুন");
       console.error("Toggle bot error:", err);
     } finally {
       setToggling(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botEnabled, toggling]);
 
   if (checking) {
