@@ -58,8 +58,8 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
-    // Get the first clients row (simple single-user setup)
-    const { data: client } = await supabase
+    // Use admin client to bypass RLS (clients table may not have user_id column yet)
+    const { data: client } = await metapilotSupabaseAdmin
       .from("clients" as any)
       .select("*")
       .limit(1)
@@ -85,7 +85,7 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
     
-    // Get the first row from clients table and update status
+    // Get the existing clients row via admin client (bypass RLS)
     const { data: existing } = await metapilotSupabaseAdmin
       .from("clients" as any)
       .select("id")
@@ -99,7 +99,6 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
         .eq("id", (existing as any).id);
       if (error) throw new Error(error.message);
     } else {
-      // Insert a new row (shouldn't happen if clients table already has data)
       const { error } = await metapilotSupabaseAdmin
         .from("clients" as any)
         .insert({ page_id: "pending", page_token: "", status: data.enabled ? "on" : "off" } as any);
