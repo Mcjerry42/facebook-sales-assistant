@@ -88,20 +88,24 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
     await assertApproved(supabase, userId);
     
     // Update the 'clients' table status field - filter by logged-in user
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from("clients" as any)
-      .select("page_id")
+      .select("id")
       .eq("user_id", userId)
       .limit(1)
       .maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
     
     if (existing) {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("clients" as any)
         .update({ status: data.enabled ? "on" : "off" } as any)
-        .eq("page_id", (existing as any).page_id)
-        .eq("user_id", userId);
+        .eq("id", (existing as any).id)
+        .eq("user_id", userId)
+        .select("id,status")
+        .maybeSingle();
       if (error) throw new Error(error.message);
+      if (!updated) throw new Error("Bot status was not updated");
     } else {
       // Insert a new row for this user
       const { error } = await supabase
