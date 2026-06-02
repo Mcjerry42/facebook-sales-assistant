@@ -58,27 +58,12 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
-    // Fetch clients row - try user_id first, fallback to first row
-    let client = null;
-    try {
-      const { data } = await supabase
-        .from("clients" as any)
-        .select("*")
-        .eq("user_id", userId)
-        .limit(1)
-        .maybeSingle();
-      client = data;
-    } catch {}
-    if (!client) {
-      try {
-        const { data } = await supabase
-          .from("clients" as any)
-          .select("*")
-          .limit(1)
-          .maybeSingle();
-        client = data;
-      } catch {}
-    }
+    // Get the first clients row (simple single-user setup)
+    const { data: client } = await supabase
+      .from("clients" as any)
+      .select("*")
+      .limit(1)
+      .maybeSingle();
     return {
       botEnabled: (client as any)?.status === "on",
       connected: !!(client as any)?.page_token,
@@ -100,43 +85,21 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
     
-    // Try lookup by user_id; if that fails (column doesn't exist yet), get first row
-    let existing: any = null;
-    let lookupError: any = null;
-    try {
-      const result = await metapilotSupabaseAdmin
-        .from("clients" as any)
-        .select("id")
-        .eq("user_id", userId)
-        .limit(1)
-        .maybeSingle();
-      existing = result.data;
-      lookupError = result.error;
-    } catch {}
-    
-    if (!existing) {
-      // Fallback: get the first row (for backward compat when user_id column doesn't exist)
-      try {
-        const result = await metapilotSupabaseAdmin
-          .from("clients" as any)
-          .select("id")
-          .limit(1)
-          .maybeSingle();
-        existing = result.data;
-      } catch {}
-    }
+    // Get the first row from clients table and update status
+    const { data: existing } = await metapilotSupabaseAdmin
+      .from("clients" as any)
+      .select("id")
+      .limit(1)
+      .maybeSingle();
     
     if (existing) {
-      const { data: updated, error } = await metapilotSupabaseAdmin
+      const { error } = await metapilotSupabaseAdmin
         .from("clients" as any)
         .update({ status: data.enabled ? "on" : "off" } as any)
-        .eq("id", (existing as any).id)
-        .select("id,status")
-        .maybeSingle();
+        .eq("id", (existing as any).id);
       if (error) throw new Error(error.message);
-      if (!updated) throw new Error("Bot status was not updated");
     } else {
-      // Insert a new row for this user
+      // Insert a new row (shouldn't happen if clients table already has data)
       const { error } = await metapilotSupabaseAdmin
         .from("clients" as any)
         .insert({ page_id: "pending", page_token: "", status: data.enabled ? "on" : "off" } as any);
