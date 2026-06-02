@@ -159,22 +159,22 @@ async function handleMessagingEvent(ev: any, pageId: string) {
     } catch { return null; }
   }
 
-  // Use 'clients' table for bot config
-  const { data: clientRow } = await metapilotSupabaseAdmin
-    .from("clients" as any)
-    .select("page_token, page_id, status")
-    .eq("page_id", pageId)
+  // Use profiles table (each user has own row with fb settings)
+  const { data: profileRow } = await metapilotSupabaseAdmin
+    .from("profiles")
+    .select("fb_page_token, fb_page_id, fb_status")
+    .eq("fb_page_id", pageId)
     .limit(1)
     .maybeSingle();
 
-  const pageToken = (clientRow as any)?.page_token;
+  const pageToken = (profileRow as any)?.fb_page_token;
   if (!pageToken) {
-    console.warn("No page_token configured; skipping reply");
+    console.warn("No fb_page_token configured; skipping reply");
     return;
   }
 
   // Check if bot is enabled
-  if ((clientRow as any)?.status !== "on") {
+  if ((profileRow as any)?.fb_status !== "on") {
     console.log("Bot is disabled; skipping reply");
     return;
   }
@@ -264,8 +264,8 @@ async function handleFeedChange(change: any, pageId: string) {
   if (!commentId || !postId) return;
   if (fromId && fromId === pageId) return;
 
-  const { data: clientRow } = await metapilotSupabaseAdmin.from("clients" as any).select("page_token, page_id").eq("page_id", pageId).limit(1).maybeSingle();
-  const pageToken = (clientRow as any)?.page_token;
+  const { data: profileRow } = await metapilotSupabaseAdmin.from("profiles").select("fb_page_token, fb_page_id").eq("fb_page_id", pageId).limit(1).maybeSingle();
+  const pageToken = (profileRow as any)?.fb_page_token;
   if (!pageToken) return;
 
   const { data: settings } = await metapilotSupabaseAdmin.from("ai_settings").select("*").limit(1).maybeSingle();

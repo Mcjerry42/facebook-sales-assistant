@@ -58,22 +58,22 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
-    // Use admin client to bypass RLS (clients table may not have user_id column yet)
-    const { data: client } = await metapilotSupabaseAdmin
-      .from("clients" as any)
-      .select("*")
-      .limit(1)
+    // Read fb_status from profiles table (each user has own row)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("fb_status, fb_page_id, fb_page_token")
+      .eq("id", userId)
       .maybeSingle();
     return {
-      botEnabled: (client as any)?.status === "on",
-      connected: !!(client as any)?.page_token,
-      pageName: (client as any)?.page_id ?? null,
+      botEnabled: (profile as any)?.fb_status === "on",
+      connected: !!(profile as any)?.fb_page_token,
+      pageName: (profile as any)?.fb_page_id ?? null,
       conversations: [],
       orders: [],
       comments: [],
       messageCount: 0,
       aiSettings: null,
-      fbConfig: client,
+      fbConfig: profile,
       sheetsConfig: null,
     };
   });
@@ -85,25 +85,12 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
     
-    // Get the existing clients row via admin client (bypass RLS)
-    const { data: existing } = await metapilotSupabaseAdmin
-      .from("clients" as any)
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-    
-    if (existing) {
-      const { error } = await metapilotSupabaseAdmin
-        .from("clients" as any)
-        .update({ status: data.enabled ? "on" : "off" } as any)
-        .eq("id", (existing as any).id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await metapilotSupabaseAdmin
-        .from("clients" as any)
-        .insert({ page_id: "pending", page_token: "", status: data.enabled ? "on" : "off" } as any);
-      if (error) throw new Error(error.message);
-    }
+    // Update fb_status in the user's own profile row
+    const { error } = await supabase
+      .from("profiles")
+      .update({ fb_status: data.enabled ? "on" : "off" } as any)
+      .eq("id", userId);
+    if (error) throw new Error(error.message);
     
     return { ok: true, botEnabled: data.enabled };
   });
