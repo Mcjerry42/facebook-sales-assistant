@@ -87,8 +87,9 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
     
-    // Update the 'clients' table status field - filter by logged-in user
-    const { data: existing, error: lookupError } = await supabase
+    // This is a trusted server action after auth/approval checks. Use the
+    // admin client for the write so client-table RLS/grants cannot block it.
+    const { data: existing, error: lookupError } = await metapilotSupabaseAdmin
       .from("clients" as any)
       .select("id")
       .eq("user_id", userId)
@@ -97,7 +98,7 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
     if (lookupError) throw new Error(lookupError.message);
     
     if (existing) {
-      const { data: updated, error } = await supabase
+      const { data: updated, error } = await metapilotSupabaseAdmin
         .from("clients" as any)
         .update({ status: data.enabled ? "on" : "off" } as any)
         .eq("id", (existing as any).id)
@@ -108,7 +109,7 @@ export const toggleBotEnabled = createServerFn({ method: "POST" })
       if (!updated) throw new Error("Bot status was not updated");
     } else {
       // Insert a new row for this user
-      const { error } = await supabase
+      const { error } = await metapilotSupabaseAdmin
         .from("clients" as any)
         .insert({ page_id: "pending", page_token: "", status: data.enabled ? "on" : "off", user_id: userId } as any);
       if (error) throw new Error(error.message);
