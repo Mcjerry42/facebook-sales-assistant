@@ -1,38 +1,21 @@
 import {
   createFileRoute,
-  Outlet,
   useNavigate,
-  Link,
-  useLocation,
-  redirect,
 } from "@tanstack/react-router";
 import type { User } from "@supabase/supabase-js";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { metapilotSupabase } from "@/lib/metapilot-supabase-browser";
-import { fixFirstUserApproval } from "@/lib/dashboard.functions";
+import { getDashboardOverview, toggleBotEnabled, fixFirstUserApproval } from "@/lib/dashboard.functions";
 import {
-  LayoutDashboard,
-  MessageSquare,
-  MessageCircle,
-  ShoppingBag,
-  Brain,
-  Sheet,
-  BarChart3,
-  Settings,
   LogOut,
   Sparkles,
-  ShieldCheck,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Sheet as SheetUI, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu } from "lucide-react";
 import { FullPageLoader } from "@/components/page-loader";
 import { Paywall } from "@/components/paywall";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard")({
-  // Auth lives in localStorage — render entirely on the client to avoid
-  // an SSR pass that has no session and produces a blank/hydration-mismatched page.
   ssr: false,
   component: DashboardLayout,
   errorComponent: DashboardError,
@@ -52,26 +35,16 @@ function DashboardError({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-const nav = [
-  { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/inbox", label: "Messenger Inbox", icon: MessageSquare },
-  { to: "/dashboard/comments", label: "Comments", icon: MessageCircle },
-  { to: "/dashboard/orders", label: "Orders", icon: ShoppingBag },
-  { to: "/dashboard/ai", label: "AI Settings", icon: Brain },
-  { to: "/dashboard/sheets", label: "Google Sheets", icon: Sheet },
-  { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/dashboard/connect", label: "Facebook & API", icon: Settings },
-];
-
 function DashboardLayout() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const [isAppOwner, setIsAppOwner] = useState<boolean | null>(null);
   const [whatsapp, setWhatsapp] = useState<string | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [botEnabled, setBotEnabled] = useState(false);
+  const [botLoading, setBotLoading] = useState(false);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -115,13 +88,12 @@ function DashboardLayout() {
       let approved = !!profile?.is_approved && notExpired;
       
       if (isOwner && roleRow?.role === "admin") {
-        // The DB trigger auto-approved them. Force override to false!
         try {
           await fixFirstUserApproval();
         } catch (e) {
           console.error("Failed to fix approval", e);
         }
-        approved = false; // Block them immediately for this session
+        approved = false;
       }
       
       setIsApproved(approved);
@@ -139,17 +111,38 @@ function DashboardLayout() {
       mounted = false;
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
 
   const signOut = async () => {
     await metapilotSupabase.auth.signOut();
     navigate({ to: "/login" });
   };
+
+  // Load bot status
+  useEffect(() => {
+    if (!isApproved) return;
+    setBotLoading(true);
+    getDashboardOverview().then((data) => {
+      setBotEnabled(data.botEnabled ?? false);
+      setBotLoading(false);
+    }).catch(() => setBotLoading(false));
+  }, [isApproved]);
+
+  const handleToggleBot = useCallback(async () => {
+    if (toggling) return;
+    setToggling(true);
+    const newState = !botEnabled;
+    try {
+      await toggleBotEnabled({ data: { enabled: newState } });
+      setBotEnabled(newState);
+      toast.success(newState ? "Bot চালু হয়েছে!" : "Bot বন্ধ হয়েছে!");
+    } catch (err) {
+      toast.error("সমস্যা হয়েছে, আবার চেষ্টা করুন");
+      console.error("Toggle bot error:", err);
+    } finally {
+      setToggling(false);
+    }
+  }, [botEnabled, toggling]);
 
   if (checking) {
     return <FullPageLoader label="Preparing your dashboard" />;
@@ -183,78 +176,63 @@ function DashboardLayout() {
     return <Paywall userEmail={user?.email} onSignOut={signOut} />;
   }
 
-  const SidebarContent = () => (
-    <>
-      <Link to="/dashboard" className="mb-8 flex items-center gap-2 px-2 pt-2">
-        <div
-          className="flex h-8 w-8 items-center justify-center rounded-lg"
-          style={{ background: "var(--gradient-primary)" }}
-        >
-          <Sparkles className="h-4 w-4 text-primary-foreground" />
-        </div>
-        <span className="font-semibold tracking-tight">MetaPilot</span>
-      </Link>
-      <nav className="flex-1 space-y-1">
-        {nav.map((item) => {
-          const active = item.exact
-            ? location.pathname === item.to
-            : location.pathname.startsWith(item.to);
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
-                active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="border-t border-sidebar-border pt-3">
-        <div className="px-3 py-2 text-xs text-muted-foreground truncate">{user?.email}</div>
-        <Button variant="ghost" size="sm" onClick={signOut} className="w-full justify-start gap-2">
-          <LogOut className="h-4 w-4" /> Sign out
-        </Button>
-      </div>
-    </>
-  );
-
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--gradient-hero)" }}>
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
-        <SidebarContent />
-      </aside>
-      <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between gap-3 border-b border-border/50 bg-sidebar/60 px-4 py-3 md:hidden">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <div
-              className="flex h-7 w-7 items-center justify-center rounded-lg"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
+    <div className="flex min-h-screen items-center justify-center p-6" style={{ background: "var(--gradient-hero)" }}>
+      <div className="w-full max-w-sm space-y-8">
+        {/* Logo */}
+        <div className="flex flex-col items-center gap-3">
+          <div
+            className="flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            <Sparkles className="h-7 w-7 text-primary-foreground" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">MetaPilot</h1>
+        </div>
+
+        {/* Bot Status Card */}
+        <div className="rounded-2xl border border-border/50 bg-card p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Bot Status</p>
+              <p className="text-lg font-semibold">
+                {botLoading ? (
+                  <span className="text-muted-foreground">Loading...</span>
+                ) : botEnabled ? (
+                  <span className="text-green-600">চালু আছে</span>
+                ) : (
+                  <span className="text-red-500">বন্ধ আছে</span>
+                )}
+              </p>
             </div>
-            <span className="font-semibold tracking-tight">MetaPilot</span>
-          </Link>
-          <SheetUI open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 bg-sidebar p-4 flex flex-col">
-              <SidebarContent />
-            </SheetContent>
-          </SheetUI>
-        </header>
-        <main className="flex-1 overflow-auto p-4 md:p-8">
-          <Outlet />
-        </main>
+            <button
+              onClick={handleToggleBot}
+              disabled={botLoading || toggling}
+              className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                botEnabled ? "bg-green-500" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  botEnabled ? "translate-x-6" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {botEnabled
+              ? "Bot আপনার Facebook পেজে মেসেজের উত্তর দিচ্ছে"
+              : "Bot বন্ধ আছে। চালু করতে উপরের টগল ব্যবহার করুন"}
+          </p>
+        </div>
+
+        {/* User Info & Sign Out */}
+        <div className="space-y-3">
+          <p className="text-center text-xs text-muted-foreground truncate">{user?.email}</p>
+          <Button variant="outline" onClick={signOut} className="w-full gap-2">
+            <LogOut className="h-4 w-4" /> Sign out
+          </Button>
+        </div>
       </div>
     </div>
   );

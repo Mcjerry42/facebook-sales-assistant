@@ -58,28 +58,55 @@ export const getDashboardOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertApproved(supabase, userId);
-    const [convs, orders, comments, msgs, settings, fb, sheets] = await Promise.all([
-      supabase
-        .from("conversations")
-        .select("id,fb_user_name,last_message,last_message_at,unread_count,human_takeover")
-        .order("last_message_at", { ascending: false })
-        .limit(50),
-      supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(50),
-      supabase.from("comments").select("*").order("created_at", { ascending: false }).limit(50),
-      supabase.from("messages").select("id", { count: "exact", head: true }),
-      supabase.from("ai_settings").select("*").limit(1).maybeSingle(),
-      supabase.from("fb_config").select("*").limit(1).maybeSingle(),
-      supabase.from("sheets_config").select("*").limit(1).maybeSingle(),
+    const [fb] = await Promise.all([
+      supabase.from("fb_config").select("*").eq("user_id", userId).limit(1).maybeSingle(),
     ]);
     return {
-      conversations: convs.data ?? [],
-      orders: orders.data ?? [],
-      comments: comments.data ?? [],
-      messageCount: msgs.count ?? 0,
-      aiSettings: settings.data,
+      botEnabled: (fb.data as any)?.bot_enabled ?? false,
+      connected: (fb.data as any)?.connected ?? false,
+      pageName: (fb.data as any)?.page_name ?? null,
+      // Legacy fields for backward compatibility (no longer used in UI)
+      conversations: [],
+      orders: [],
+      comments: [],
+      messageCount: 0,
+      aiSettings: null,
       fbConfig: fb.data,
-      sheetsConfig: sheets.data,
+      sheetsConfig: null,
     };
+  });
+
+export const toggleBotEnabled = createServerFn({ method: "POST" })
+  .middleware([requireMetapilotAuth])
+  .inputValidator((d: unknown) => z.object({ enabled: z.boolean() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    await assertApproved(supabase, userId);
+    
+    // Ensure fb_config exists for this user
+    const { data: existing } = await supabase
+      .from("fb_config")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+    
+    if (!existing) {
+      // Create fb_config for this user
+      const { error } = await supabase.from("fb_config").insert({
+        user_id: userId,
+        bot_enabled: data.enabled,
+      });
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase
+        .from("fb_config")
+        .update({ bot_enabled: data.enabled, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    }
+    
+    return { ok: true, botEnabled: data.enabled };
   });
 
 export const getMessages = createServerFn({ method: "GET" })
@@ -162,7 +189,7 @@ export const saveFbConfig = createServerFn({ method: "POST" })
       const { error } = await supabase.from("fb_config").update(payload).eq("id", existing.id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await supabase.from("fb_config").insert(payload);
+      const { error } = await supabase.from("fb_config").insert({ ...payload, user_id: userId });
       if (error) throw new Error(error.message);
     }
 
@@ -228,6 +255,7 @@ export const connectSheet = createServerFn({ method: "POST" })
       .slice(1)
       .filter((r) => r.some((c) => c.trim()))
       .map((row) => ({
+        user_id: userId,
         question: qIdx >= 0 ? row[qIdx] : row[0],
         answer: aIdx >= 0 ? row[aIdx] : row.slice(1).join(" | "),
         category: cIdx >= 0 ? row[cIdx] : null,
@@ -253,7 +281,7 @@ export const connectSheet = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     };
     if (existing) await supabase.from("sheets_config").update(payload).eq("id", existing.id);
-    else await supabase.from("sheets_config").insert(payload);
+    else await supabase.from("sheets_config").insert({ ...payload, user_id: userId });
 
     return { ok: true, rowCount: entries.length };
   });
@@ -394,7 +422,7 @@ export const saveOrdersSheet = createServerFn({ method: "POST" })
     } else {
       const { error } = await supabase
         .from("sheets_config")
-        .insert({ orders_sheet_url: data.orders_sheet_url ?? null });
+        .insert({ orders_sheet_url: data.orders_sheet_url ?? null, user_id: userId });
       if (error) throw new Error(error.message);
     }
     return { ok: true };

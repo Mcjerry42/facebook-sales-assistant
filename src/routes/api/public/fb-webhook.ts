@@ -197,6 +197,12 @@ async function handleMessagingEvent(ev: any, pageId: string) {
     return;
   }
 
+  // Check if bot is enabled for this user
+  if ((cfg as any).bot_enabled === false) {
+    console.log("Bot is disabled for this user; skipping reply");
+    return;
+  }
+
   // Fetch settings, KB, and find conversation in parallel
   const [settingsRes, kbRes, convRes] = await Promise.all([
     metapilotSupabaseAdmin

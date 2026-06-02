@@ -20,6 +20,7 @@ export type Database = {
           auto_hide_abusive: boolean
           auto_reply_comments: boolean
           auto_reply_messages: boolean
+          base_url: string | null
           comment_trigger_keywords: string[]
           id: string
           language_mode: string
@@ -27,12 +28,14 @@ export type Database = {
           provider: string
           system_instructions: string
           updated_at: string
+          user_id: string
         }
         Insert: {
           api_key?: string | null
           auto_hide_abusive?: boolean
           auto_reply_comments?: boolean
           auto_reply_messages?: boolean
+          base_url?: string | null
           comment_trigger_keywords?: string[]
           id?: string
           language_mode?: string
@@ -40,12 +43,14 @@ export type Database = {
           provider?: string
           system_instructions?: string
           updated_at?: string
+          user_id: string
         }
         Update: {
           api_key?: string | null
           auto_hide_abusive?: boolean
           auto_reply_comments?: boolean
           auto_reply_messages?: boolean
+          base_url?: string | null
           comment_trigger_keywords?: string[]
           id?: string
           language_mode?: string
@@ -53,6 +58,7 @@ export type Database = {
           provider?: string
           system_instructions?: string
           updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -62,18 +68,21 @@ export type Database = {
           event_type: string
           id: string
           meta: Json | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string
           event_type: string
           id?: string
           meta?: Json | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string
           event_type?: string
           id?: string
           meta?: Json | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -122,6 +131,7 @@ export type Database = {
           id: string
           post_id: string | null
           text: string
+          user_id: string
         }
         Insert: {
           action?: string
@@ -134,6 +144,7 @@ export type Database = {
           id?: string
           post_id?: string | null
           text: string
+          user_id: string
         }
         Update: {
           action?: string
@@ -146,6 +157,7 @@ export type Database = {
           id?: string
           post_id?: string | null
           text?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -161,6 +173,7 @@ export type Database = {
           last_message_at: string
           status: string
           unread_count: number
+          user_id: string
         }
         Insert: {
           created_at?: string
@@ -173,6 +186,7 @@ export type Database = {
           last_message_at?: string
           status?: string
           unread_count?: number
+          user_id: string
         }
         Update: {
           created_at?: string
@@ -185,12 +199,14 @@ export type Database = {
           last_message_at?: string
           status?: string
           unread_count?: number
+          user_id?: string
         }
         Relationships: []
       }
       fb_config: {
         Row: {
           app_secret: string | null
+          bot_enabled: boolean
           connected: boolean
           id: string
           monitored_post_ids: string[]
@@ -198,10 +214,12 @@ export type Database = {
           page_id: string | null
           page_name: string | null
           updated_at: string
+          user_id: string
           verify_token: string | null
         }
         Insert: {
           app_secret?: string | null
+          bot_enabled?: boolean
           connected?: boolean
           id?: string
           monitored_post_ids?: string[]
@@ -209,10 +227,12 @@ export type Database = {
           page_id?: string | null
           page_name?: string | null
           updated_at?: string
+          user_id: string
           verify_token?: string | null
         }
         Update: {
           app_secret?: string | null
+          bot_enabled?: boolean
           connected?: boolean
           id?: string
           monitored_post_ids?: string[]
@@ -220,6 +240,7 @@ export type Database = {
           page_id?: string | null
           page_name?: string | null
           updated_at?: string
+          user_id?: string
           verify_token?: string | null
         }
         Relationships: []
@@ -232,6 +253,7 @@ export type Database = {
           id: string
           question: string | null
           raw_row: Json | null
+          user_id: string
         }
         Insert: {
           answer?: string | null
@@ -240,6 +262,7 @@ export type Database = {
           id?: string
           question?: string | null
           raw_row?: Json | null
+          user_id: string
         }
         Update: {
           answer?: string | null
@@ -248,6 +271,7 @@ export type Database = {
           id?: string
           question?: string | null
           raw_row?: Json | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -259,6 +283,7 @@ export type Database = {
           is_ai: boolean
           sender: string
           text: string
+          user_id: string
         }
         Insert: {
           conversation_id: string
@@ -267,6 +292,7 @@ export type Database = {
           is_ai?: boolean
           sender: string
           text: string
+          user_id: string
         }
         Update: {
           conversation_id?: string
@@ -275,6 +301,7 @@ export type Database = {
           is_ai?: boolean
           sender?: string
           text?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -380,6 +407,7 @@ export type Database = {
           sheet_name: string | null
           sheet_url: string | null
           updated_at: string
+          user_id: string
         }
         Insert: {
           connected?: boolean
@@ -394,6 +422,7 @@ export type Database = {
           sheet_name?: string | null
           sheet_url?: string | null
           updated_at?: string
+          user_id: string
         }
         Update: {
           connected?: boolean
@@ -408,6 +437,7 @@ export type Database = {
           sheet_name?: string | null
           sheet_url?: string | null
           updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
