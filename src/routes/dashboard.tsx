@@ -236,9 +236,14 @@ function DashboardLayout() {
         {/* User Info & Sign Out */}
         <div className="space-y-3">
           <p className="text-center text-xs text-muted-foreground truncate">{user?.email}</p>
-          <Button variant="outline" onClick={signOut} className="w-full gap-2">
-            <LogOut className="h-4 w-4" /> Sign out
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild className="flex-1">
+              <a href="/dashboard/users" className="text-xs">👥 Users</a>
+            </Button>
+            <Button variant="outline" onClick={signOut} className="flex-1 gap-2">
+              <LogOut className="h-4 w-4" /> Sign out
+            </Button>
+          </div>
         </div>
       </div>
     </div>
