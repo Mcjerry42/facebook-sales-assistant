@@ -3,9 +3,15 @@ import { getRequestHeader } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
+function envValue(value: string | undefined) {
+  return value?.replace(/^["']|["']$/g, "");
+}
+
 export const requireMetapilotAuth = createMiddleware({ type: "function" }).server(async ({ next }) => {
-  const url = process.env.METAPILOT_SUPABASE_URL || process.env.SUPABASE_URL;
-  const publishableKey = process.env.METAPILOT_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  const url = envValue(process.env.METAPILOT_SUPABASE_URL || process.env.SUPABASE_URL);
+  const publishableKey = envValue(
+    process.env.METAPILOT_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY,
+  );
 
   if (!url || !publishableKey) {
     throw new Error(

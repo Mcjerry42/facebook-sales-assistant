@@ -1,9 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
+function envValue(value: string | undefined) {
+  return value?.replace(/^["']|["']$/g, "");
+}
+
 function getMetapilotServerConfig() {
-  const url = process.env.METAPILOT_SUPABASE_URL || process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.METAPILOT_SUPABASE_SERVICE_ROLE_KEY;
+  const url = envValue(process.env.METAPILOT_SUPABASE_URL || process.env.SUPABASE_URL);
+  const serviceRoleKey = envValue(process.env.METAPILOT_SUPABASE_SERVICE_ROLE_KEY);
 
   if (!url || !serviceRoleKey) {
     throw new Error(
